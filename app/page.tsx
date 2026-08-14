@@ -11,6 +11,28 @@ const work:Work[]=[
 const navigation=["Overview","My work","Clients","Compliance","Documents","Calendar","Team","Billing","Insights"];
 const icons=["⌂","✓","◇","◫","▱","□","♙","₹","⌁"];
 
+type ClientRecord={name:string;short:string;type:string;pan:string;gstins:number;owner:string;services:string[];health:number;risk:"Healthy"|"Watch"|"Critical";next:string;missing:number;city:string;joined:string};
+const clients:ClientRecord[]=[
+ {name:"Aarav Retail Private Limited",short:"AR",type:"Private Company",pan:"AABCA••••F",gstins:3,owner:"Nisha S.",services:["GST","TDS","Books"],health:74,risk:"Watch",next:"GSTR-3B · Today",missing:18,city:"Patna, Bihar",joined:"Apr 2023"},
+ {name:"Koshi Infra LLP",short:"KI",type:"LLP",pan:"AAEFK••••Q",gstins:2,owner:"Rahul K.",services:["GST","TDS","Audit","ROC"],health:58,risk:"Critical",next:"TDS 26Q · Overdue",missing:4,city:"Gurugram, Haryana",joined:"Jul 2022"},
+ {name:"Brightpath Foundation",short:"BF",type:"Trust / NPO",pan:"AABTB••••K",gstins:1,owner:"Priya M.",services:["ITR","Audit","10B"],health:91,risk:"Healthy",next:"Form 10B · 22 Aug",missing:0,city:"New Delhi",joined:"Jan 2024"},
+ {name:"Saanvi Exports",short:"SE",type:"Partnership",pan:"AALFS••••C",gstins:4,owner:"Nisha S.",services:["GST","LUT","Books"],health:82,risk:"Healthy",next:"Export recon · 25 Aug",missing:7,city:"Kolkata, West Bengal",joined:"Oct 2021"},
+ {name:"Neelam Foods",short:"NF",type:"Proprietorship",pan:"BRQPN••••D",gstins:1,owner:"Vikram R.",services:["GST","Books","ITR"],health:69,risk:"Watch",next:"Book close · Tomorrow",missing:2,city:"Noida, Uttar Pradesh",joined:"May 2025"},
+];
+
+function ClientsModule(){
+ const [selected,setSelected]=useState<ClientRecord>(clients[0]); const [segment,setSegment]=useState("All clients"); const [search,setSearch]=useState("");
+ const visible=clients.filter(c=>(segment==="All clients"||c.risk===segment)&&(!search||c.name.toLowerCase().includes(search.toLowerCase())));
+ return <div className="clients-module">
+  <section className="clients-title"><div><p><span>PORTFOLIO</span> 148 active clients</p><h1>Client command centre</h1><small>Manage entities, registrations, engagements and compliance health from one place.</small></div><div><button>⇧ Import clients</button><button>＋ Add new client</button></div></section>
+  <section className="client-metrics"><article><span className="cm violet">◇</span><div><small>CLIENT GROUPS</small><b>126</b><em>148 legal entities</em></div></article><article><span className="cm blue">▦</span><div><small>GST REGISTRATIONS</small><b>219</b><em>17 states covered</em></div></article><article><span className="cm mint">✓</span><div><small>HEALTHY PORTFOLIO</small><b>86%</b><em>↑ 4.2% this month</em></div></article><article><span className="cm coral">!</span><div><small>NEED ATTENTION</small><b>19</b><em>6 critical clients</em></div></article></section>
+  <section className="client-layout">
+   <div className="portfolio card"><div className="portfolio-tools"><label><span>⌕</span><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search client or PAN…"/></label><div>{["All clients","Healthy","Watch","Critical"].map(x=><button key={x} onClick={()=>setSegment(x)} className={segment===x?"active":""}>{x}</button>)}</div><button className="filter-btn">☷ Filters</button></div><div className="portfolio-head"><span>CLIENT / ENTITY</span><span>SERVICES</span><span>HEALTH</span><span>NEXT OBLIGATION</span><span>OWNER</span></div>{visible.map(c=><button className={selected.name===c.name?"portfolio-row selected":"portfolio-row"} key={c.name} onClick={()=>setSelected(c)}><div className="entity-cell"><span>{c.short}</span><div><b>{c.name}</b><small>{c.type} · PAN {c.pan}</small><em>{c.gstins} GSTIN{c.gstins>1?"s":""}</em></div></div><div className="service-chips">{c.services.slice(0,3).map(s=><span key={s}>{s}</span>)}{c.services.length>3&&<i>+{c.services.length-3}</i>}</div><div className="client-health"><div><i style={{width:c.health+"%"}}/></div><b>{c.health}%</b><em className={c.risk.toLowerCase()}>{c.risk}</em></div><div className="next-item"><b>{c.next}</b><small>{c.missing?c.missing+" items missing":"Everything ready"}</small></div><div className="portfolio-owner"><span>{c.owner.split(" ").map(x=>x[0]).join("")}</span><b>{c.owner}</b></div></button>)}</div>
+   <aside className="client-360 card"><div className="c360-cover"><div className="c360-orb one"/><div className="c360-orb two"/><span>{selected.short}</span><div><small>{selected.risk.toUpperCase()} CLIENT</small><h2>{selected.name}</h2><p>{selected.type} · {selected.city}</p></div><button>•••</button></div><div className="c360-tabs"><button className="active">Overview</button><button>Compliance</button><button>Documents</button><button>Billing</button></div><div className="c360-body"><div className="profile-health"><div><span>RELATIONSHIP HEALTH</span><b>{selected.health}<small>/100</small></b><em className={selected.risk.toLowerCase()}>{selected.risk}</em></div><div className="mini-ring" style={{background:"conic-gradient(#6f5ce7 0 "+selected.health+"%,#eeecfb "+selected.health+"%)"}}><i/></div></div><section><p className="detail-label">REGISTRATIONS & IDENTITY</p><div className="detail-grid"><div><small>PAN</small><b>{selected.pan}</b></div><div><small>GSTIN</small><b>{selected.gstins} active</b></div><div><small>Relationship since</small><b>{selected.joined}</b></div><div><small>Owner</small><b>{selected.owner}</b></div></div></section><section><p className="detail-label">ACTIVE SERVICES</p><div className="active-services">{selected.services.map((s,i)=><span key={s}><i>{["◇","₹","◫","▱"][i%4]}</i>{s}<b>Active</b></span>)}</div></section><section><p className="detail-label">NEXT ACTION</p><div className="next-action"><span>◷</span><div><b>{selected.next}</b><small>{selected.missing?selected.missing+" documents or exceptions need attention":"Ready for completion"}</small></div><button>Open →</button></div></section><div className="c360-actions"><button>Request document</button><button>Open Client 360 →</button></div></div></aside>
+  </section>
+ </div>
+}
+
 export default function Dashboard(){
  const [active,setActive]=useState("Overview"); const [filter,setFilter]=useState("All"); const [query,setQuery]=useState(""); const [menu,setMenu]=useState(false);
  const items=useMemo(()=>work.filter(x=>(filter==="All"||x.status===filter)&&(!query||(`${x.client} ${x.service} ${x.owner}`).toLowerCase().includes(query.toLowerCase()))),[filter,query]);
@@ -27,6 +49,7 @@ export default function Dashboard(){
   <section className="main">
    <header><button className="menu" onClick={()=>setMenu(true)}>☰</button><label className="global-search"><span>⌕</span><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search clients, PAN, GSTIN, tasks…"/><kbd>⌘ K</kbd></label><div className="header-actions"><button className="fy">FY 2026–27⌄</button><button className="notify">♢<i/></button><button className="add">＋ <span>Create new</span></button></div></header>
    <div className="page">
+    {active==="Clients"?<ClientsModule/>:<>
     <section className="title-row"><div><p><span>LIVE</span> Friday, 14 August</p><h1>{active==="Overview"?"Your practice, in command.":active}</h1><small>Good evening, Loukesh. Here’s the pulse of your firm today.</small></div><div className="title-actions"><button>Export report</button><button>Open my work <span>→</span></button></div></section>
 
     <section className="pulse-card">
@@ -49,6 +72,7 @@ export default function Dashboard(){
       <div className="deadline-card card"><div className="card-head"><div><span className="mini-kicker">UPCOMING</span><h3>Deadline radar</h3></div><button>Calendar →</button></div><div className="deadline-list"><article><time><b>16</b><small>AUG</small></time><div><b>GSTR-1 · IFF</b><small>7 clients · 2 not started</small></div><span className="urgent">2 days</span></article><article><time><b>20</b><small>AUG</small></time><div><b>GSTR-3B</b><small>14 clients · 5 at risk</small></div><span>6 days</span></article><article><time><b>31</b><small>AUG</small></time><div><b>TDS payment</b><small>9 deductors · On track</small></div><span>17 days</span></article></div></div>
      </aside>
     </section>
+    </>}
    </div>
   </section>
  </main>
