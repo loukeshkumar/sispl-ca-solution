@@ -4,6 +4,13 @@ import test from "node:test";
 
 const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
 
+const finalFontSize = (selector: string) => {
+  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const matches = [...css.matchAll(new RegExp(`${escaped}\\{[^}]*font-size:([^;}]+)`, "g"))];
+  assert.ok(matches.length > 0, `missing font-size declaration for ${selector}`);
+  return matches.at(-1)![1];
+};
+
 test("dashboard typography uses one Geist stack and the approved scale", () => {
   assert.match(css, /body\{[^}]*font-family:var\(--font-geist-sans\)/);
   assert.doesNotMatch(css, /font-family:Arial,Helvetica,sans-serif/);
@@ -42,4 +49,7 @@ test("Overview widgets use the readable typography tokens", () => {
   ] as const) {
     assert.match(css, rule, `${name} must use the approved readable scale`);
   }
+
+  assert.equal(finalFontSize(".portfolio-owner span"), "var(--type-compact)");
+  assert.equal(finalFontSize(".active-services b"), "var(--type-compact)");
 });
