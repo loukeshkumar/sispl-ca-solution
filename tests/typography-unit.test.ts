@@ -77,4 +77,18 @@ test("Overview widgets use the readable typography tokens", () => {
     assert.match(color, /^#[0-9a-f]{6}$/i, `${selector} must use a hex color`);
     assert.ok(contrastRatio(color, "#ffffff") >= 4.5, `${selector} color ${color} must meet WCAG AA contrast`);
   }
+
+  for (const [selector, background] of [
+    [".title-row small", "#f5f6fa"],
+    [".card-head p", "#ffffff"],
+    [".table-labels", "#fafbfc"],
+    [".deadline small", "#ffffff"],
+    [".clients-title p", "#f5f6fa"],
+    [".client-metrics em", "#ffffff"],
+    [".portfolio-head", "#fafbfc"],
+  ] as const) {
+    const color = finalProperty(selector, "color");
+    assert.match(color, /^#[0-9a-f]{6}$/i, `${selector} must use a hex color`);
+    assert.ok(contrastRatio(color, background) >= 4.5, `${selector} color ${color} must meet WCAG AA contrast on ${background}`);
+  }
 });
