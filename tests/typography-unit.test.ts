@@ -37,6 +37,8 @@ test("Overview widgets use the readable typography tokens", () => {
     ["pulse score status", /\.pulse-score>em\{[^}]*font-size:var\(--type-compact\)/],
     ["pulse action avatars", /\.pulse-actions>span i\{[^}]*font-size:var\(--type-compact\)/],
     ["client avatar initials", /\.client>span\{[^}]*font-size:var\(--type-compact\)/],
+    ["portfolio owner initials", /\.portfolio-owner span\{[^}]*font-size:var\(--type-compact\)/],
+    ["active service status", /\.active-services b\{[^}]*font-size:var\(--type-compact\)/],
   ] as const) {
     assert.match(css, rule, `${name} must use the approved readable scale`);
   }

@@ -47,6 +47,8 @@
 .pulse-score>em{font-size:var(--type-compact)}
 .pulse-actions>span i{font-size:var(--type-compact)}
 .client>span{font-size:var(--type-compact)}
+.portfolio-owner span{font-size:var(--type-compact)}
+.active-services b{font-size:var(--type-compact)}
 
 .client-metrics{gap:16px}.client-metrics article{height:108px;padding:18px}.cm{width:44px;height:44px;font-size:15px}.client-metrics small{font-size:9px}.client-metrics b{font-size:25px;margin:5px 0}.client-metrics em{font-size:10px}
 .client-layout{grid-template-columns:minmax(0,1.52fr) minmax(390px,.8fr);gap:18px}.portfolio-tools{padding:17px 19px;gap:12px}.portfolio-tools label{height:40px;width:245px}.portfolio-tools input{font-size:11px}.portfolio-tools>div button{height:34px;font-size:10px;padding:0 12px}.filter-btn{height:36px;font-size:10px;padding:0 11px}
