@@ -102,13 +102,12 @@ body{font-size:15px}
 .title-row small,.clients-title small{font-size:var(--type-supporting)}
 .client-metrics small,.portfolio-head{font-size:var(--type-label)}
 .client-metrics b{font-size:var(--type-kpi)}
-.client-metrics em,.entity-cell b{font-size:var(--type-supporting)}
+.client-metrics em{font-size:var(--type-supporting)}
+.entity-cell b{font-size:var(--type-primary)}
 .entity-cell small,.entity-cell em,.service-chips span,.service-chips i,.client-health>b,.client-health em,.next-item b,.next-item small,.portfolio-owner b{font-size:var(--type-compact)}
 .c360-cover small,.c360-cover p,.c360-tabs button,.profile-health span,.detail-label,.detail-grid small,.detail-grid b,.active-services>span,.active-services b,.next-action b,.next-action small,.c360-actions button{font-size:var(--type-compact)}
 .c360-cover h2{font-size:var(--type-card-title)}
 .database-error-card small{font-size:var(--type-compact)}
-.entity-cell b{font-size:var(--type-primary)}
-.client-metrics em{font-size:var(--type-supporting)}
 .logo small{font-size:var(--type-compact)}
 .side nav em{font-size:var(--type-compact)}
 .title-row>div:first-child>p,.clients-title p{font-size:var(--type-label)}
@@ -116,7 +115,18 @@ body{font-size:15px}
 .filter-btn{font-size:var(--type-compact)}
 .profile-health em{font-size:var(--type-compact)}
 .database-error-card>span{font-size:var(--type-compact)}
-.title-row>div:first-child>p{font-size:var(--type-label)}
-.clients-title p{font-size:var(--type-label)}
 .firm-card>span{font-size:var(--type-compact)}
 .next-action button{font-size:var(--type-compact)}
+.title-row>div:first-child>p,.clients-title p{color:#58677b}
+.metrics>button>div:nth-child(2)>span{color:#58677b}
+.progress span{color:#58677b}
+.empty{color:#58677b}
+.donut span{color:#58677b}
+.service-list>div>span{color:#58677b}
+.portfolio-tools>div button{color:#58677b}
+.profile-health span,.detail-label{color:#58677b}
+.section-label{color:#b3bdd0}
+.firm-card small{color:#b3bdd0}
+.profile-health span{color:#58677b}
+.detail-label{color:#58677b}
+.deadline small{font-size:var(--type-compact)}

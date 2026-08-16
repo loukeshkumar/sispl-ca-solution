@@ -5,10 +5,16 @@ import test from "node:test";
 const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
 
 const finalProperty = (selector: string, property: string) => {
-  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const matches = [...css.matchAll(new RegExp(`${escaped}\\{[^}]*${property}:([^;}]+)`, "g"))];
-  assert.ok(matches.length > 0, `missing ${property} declaration for ${selector}`);
-  return matches.at(-1)![1];
+  let value: string | undefined;
+  for (const match of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    const selectors = match[1].split(",").map((item) => item.trim());
+    if (!selectors.includes(selector)) continue;
+    for (const declaration of match[2].matchAll(new RegExp(`${property}:([^;]+)`, "g"))) {
+      value = declaration[1].trim().replace(/\s*!important$/, "");
+    }
+  }
+  assert.ok(value, `missing ${property} declaration for ${selector}`);
+  return value;
 };
 
 const finalFontSize = (selector: string) => finalProperty(selector, "font-size");
@@ -73,6 +79,23 @@ test("Overview widgets use the readable typography tokens", () => {
   assert.equal(finalFontSize(".title-row h1"), "var(--type-page-title)");
   assert.equal(finalFontSize(".clients-title h1"), "var(--type-page-title)");
   assert.equal(finalFontSize(".side nav button"), "var(--type-nav)");
+  const finalCascadeTable = [
+    [".firm-card small", "var(--type-label)"], [".firm-card b", "var(--type-primary)"], [".firm-card em", "var(--type-supporting)"],
+    [".section-label", "var(--type-label)"], [".side nav button", "var(--type-nav)"], [".upgrade p", "var(--type-supporting)"],
+    [".account small", "var(--type-compact)"], [".global-search input", "var(--type-primary)"], [".pulse-copy>p", "var(--type-supporting)"],
+    [".metrics>button>div:nth-child(2)>span", "var(--type-label)"], [".metrics>button>div:nth-child(2)>small", "var(--type-compact)"],
+    [".table-labels", "var(--type-label)"], [".client b", "var(--type-primary)"], [".client p", "var(--type-supporting)"],
+    [".client small", "var(--type-compact)"], [".owner b", "var(--type-supporting)"], [".deadline small", "var(--type-compact)"],
+    [".health-copy span", "var(--type-supporting)"], [".service-list>div", "var(--type-compact)"], [".deadline-list article>div small", "var(--type-compact)"],
+    [".client-metrics small", "var(--type-label)"], [".entity-cell b", "var(--type-primary)"], [".entity-cell small", "var(--type-compact)"],
+    [".service-chips span", "var(--type-compact)"], [".client-health>b", "var(--type-compact)"], [".next-item b", "var(--type-compact)"],
+    [".portfolio-owner b", "var(--type-compact)"], [".c360-cover p", "var(--type-compact)"], [".c360-tabs button", "var(--type-compact)"],
+    [".detail-grid small", "var(--type-compact)"], [".active-services>span", "var(--type-compact)"], [".next-action button", "var(--type-compact)"],
+    [".database-error-card small", "var(--type-compact)"],
+  ] as const;
+  for (const [selector, token] of finalCascadeTable) {
+    assert.equal(finalFontSize(selector), token, `${selector} final cascade must resolve to ${token}`);
+  }
   for (const [selector, token] of [
     [".logo small", "var(--type-compact)"],
     [".firm-card>span", "var(--type-compact)"],
@@ -117,6 +140,24 @@ test("Overview widgets use the readable typography tokens", () => {
     [".clients-title p", "#f5f6fa"],
     [".client-metrics em", "#ffffff"],
     [".portfolio-head", "#fafbfc"],
+  ] as const) {
+    const color = finalProperty(selector, "color");
+    assert.match(color, /^#[0-9a-f]{6}$/i, `${selector} must use a hex color`);
+    assert.ok(contrastRatio(color, background) >= 4.5, `${selector} color ${color} must meet WCAG AA contrast on ${background}`);
+  }
+
+  for (const [selector, background] of [
+    [".title-row>div:first-child>p", "#f5f6fa"],
+    [".metrics>button>div:nth-child(2)>span", "#ffffff"],
+    [".progress span", "#ffffff"],
+    [".empty", "#ffffff"],
+    [".donut span", "#ffffff"],
+    [".service-list>div>span", "#ffffff"],
+    [".portfolio-tools>div button", "#ffffff"],
+    [".profile-health span", "#f8f7ff"],
+    [".detail-label", "#ffffff"],
+    [".section-label", "#101d39"],
+    [".firm-card small", "#1a2b4d"],
   ] as const) {
     const color = finalProperty(selector, "color");
     assert.match(color, /^#[0-9a-f]{6}$/i, `${selector} must use a hex color`);
