@@ -118,3 +118,5 @@ body{font-size:15px}
 .database-error-card>span{font-size:var(--type-compact)}
 .title-row>div:first-child>p{font-size:var(--type-label)}
 .clients-title p{font-size:var(--type-label)}
+.firm-card>span{font-size:var(--type-compact)}
+.next-action button{font-size:var(--type-compact)}

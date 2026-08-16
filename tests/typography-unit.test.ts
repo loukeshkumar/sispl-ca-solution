@@ -75,6 +75,7 @@ test("Overview widgets use the readable typography tokens", () => {
   assert.equal(finalFontSize(".side nav button"), "var(--type-nav)");
   for (const [selector, token] of [
     [".logo small", "var(--type-compact)"],
+    [".firm-card>span", "var(--type-compact)"],
     [".side nav em", "var(--type-compact)"],
     [".title-row>div:first-child>p", "var(--type-label)"],
     [".clients-title p", "var(--type-label)"],
@@ -82,6 +83,7 @@ test("Overview widgets use the readable typography tokens", () => {
     [".filter-btn", "var(--type-compact)"],
     [".profile-health em", "var(--type-compact)"],
     [".database-error-card>span", "var(--type-compact)"],
+    [".next-action button", "var(--type-compact)"],
   ] as const) {
     assert.equal(finalFontSize(selector), token, `${selector} must use ${token}`);
   }
