@@ -1,21 +1,46 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import postcss from "postcss";
 
 const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
 
-const finalProperty = (selector: string, property: string) => {
-  let value: string | undefined;
-  for (const match of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
-    const selectors = match[1].split(",").map((item) => item.trim());
-    if (!selectors.includes(selector)) continue;
-    for (const declaration of match[2].matchAll(new RegExp(`${property}:([^;]+)`, "g"))) {
-      value = declaration[1].trim().replace(/\s*!important$/, "");
-    }
-  }
-  assert.ok(value, `missing ${property} declaration for ${selector}`);
-  return value;
+const specificity = (selector: string) => {
+  const ids = (selector.match(/#[\w-]+/g) ?? []).length;
+  const classes = (selector.match(/\.[\w-]+|\[[^]]+\]|:[\w-]+/g) ?? []).length;
+  const elements = (selector.replace(/[#.][\w-]+|\[[^]]+\]|:[\w-]+/g, "").match(/[a-zA-Z]+/g) ?? []).length;
+  return ids * 100 + classes * 10 + elements;
 };
+
+const mediaApplies = (params: string, viewport: number) => {
+  const max = params.match(/max-width\s*:\s*(\d+)px/);
+  const min = params.match(/min-width\s*:\s*(\d+)px/);
+  return (!max || viewport <= Number(max[1])) && (!min || viewport >= Number(min[1]));
+};
+
+const resolveCssProperty = (source: string, selector: string, property: string, viewport = 1440) => {
+  const root = postcss.parse(source);
+  let order = 0;
+  let winner: { value: string; important: boolean; specificity: number; order: number } | undefined;
+  const visit = (container: postcss.Container, active: boolean) => {
+    container.each((node) => {
+      if (node.type === "atrule" && node.name === "media") {
+        visit(node as postcss.Container, active && mediaApplies(node.params, viewport));
+      } else if (node.type === "rule" && active && node.selectors.some((item) => item.trim() === selector)) {
+        node.walkDecls(property, (decl) => {
+          const candidate = { value: decl.value.trim(), important: decl.important, specificity: specificity(selector), order: order++ };
+          if (!winner || (candidate.important !== winner.important ? candidate.important : candidate.specificity >= winner.specificity)) winner = candidate;
+        });
+      }
+      order++;
+    });
+  };
+  visit(root, true);
+  assert.ok(winner, `missing ${property} declaration for ${selector}`);
+  return winner!.value;
+};
+
+const finalProperty = (selector: string, property: string) => resolveCssProperty(css, selector, property);
 
 const finalFontSize = (selector: string) => finalProperty(selector, "font-size");
 
@@ -90,7 +115,11 @@ test("Overview widgets use the readable typography tokens", () => {
     [".client-metrics small", "var(--type-label)"], [".entity-cell b", "var(--type-primary)"], [".entity-cell small", "var(--type-compact)"],
     [".service-chips span", "var(--type-compact)"], [".client-health>b", "var(--type-compact)"], [".next-item b", "var(--type-compact)"],
     [".portfolio-owner b", "var(--type-compact)"], [".c360-cover p", "var(--type-compact)"], [".c360-tabs button", "var(--type-compact)"],
-    [".detail-grid small", "var(--type-compact)"], [".active-services>span", "var(--type-compact)"], [".next-action button", "var(--type-compact)"],
+    [".c360-cover small", "var(--type-compact)"], [".c360-cover h2", "var(--type-card-title)"], [".c360-cover p", "var(--type-compact)"],
+    [".c360-tabs button", "var(--type-compact)"], [".profile-health span", "var(--type-compact)"], [".profile-health em", "var(--type-compact)"],
+    [".detail-label", "var(--type-compact)"], [".detail-grid small", "var(--type-compact)"], [".detail-grid b", "var(--type-compact)"],
+    [".active-services>span", "var(--type-compact)"], [".active-services b", "var(--type-compact)"], [".next-action b", "var(--type-compact)"],
+    [".next-action small", "var(--type-compact)"], [".next-action button", "var(--type-compact)"], [".c360-actions button", "var(--type-compact)"],
     [".database-error-card small", "var(--type-compact)"],
   ] as const;
   for (const [selector, token] of finalCascadeTable) {
@@ -163,4 +192,20 @@ test("Overview widgets use the readable typography tokens", () => {
     assert.match(color, /^#[0-9a-f]{6}$/i, `${selector} must use a hex color`);
     assert.ok(contrastRatio(color, background) >= 4.5, `${selector} color ${color} must meet WCAG AA contrast on ${background}`);
   }
+
+  for (const [selector, background] of [
+    [".logo small", "#111f3e"], [".firm-card em", "#1a2b4d"], [".account small", "#0d1932"], [".upgrade p", "#1c2d52"],
+    [".clients-title small", "#f5f6fa"], [".tabs button", "#ffffff"], [".c360-tabs button", "#ffffff"], [".donut small", "#ffffff"],
+  ] as const) {
+    const color = finalProperty(selector, "color");
+    assert.match(color, /^#[0-9a-f]{6}$/i, `${selector} must use a hex color`);
+    assert.ok(contrastRatio(color, background) >= 4.5, `${selector} color ${color} must meet WCAG AA contrast on ${background}`);
+  }
+});
+
+test("cascade resolver handles grouped rules, importance, media, specificity, and source order", () => {
+  const fixture = "a,b{font-size:9px}b{font-size:10px!important}@media(max-width:780px){b{font-size:11px!important}}.scope b{font-size:12px}";
+  assert.equal(resolveCssProperty(fixture, "b", "font-size", 1440), "10px");
+  assert.equal(resolveCssProperty(fixture, "b", "font-size", 375), "11px");
+  assert.equal(resolveCssProperty(fixture, ".scope b", "font-size"), "12px");
 });

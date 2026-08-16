@@ -127,6 +127,12 @@ body{font-size:15px}
 .profile-health span,.detail-label{color:#58677b}
 .section-label{color:#b3bdd0}
 .firm-card small{color:#b3bdd0}
-.profile-health span{color:#58677b}
-.detail-label{color:#58677b}
 .deadline small{font-size:var(--type-compact)}
+.logo small{color:#b3bdd0}
+.firm-card em{color:#b3bdd0}
+.account small{color:#b3bdd0}
+.upgrade p{color:#b3bdd0}
+.clients-title small{color:#58677b}
+.tabs button{color:#58677b}
+.c360-tabs button{color:#58677b}
+.donut small{color:#58677b}
