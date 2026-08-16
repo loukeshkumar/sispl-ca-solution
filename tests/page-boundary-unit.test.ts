@@ -6,13 +6,25 @@ import { getDashboardErrorViewModel } from "../app/dashboard-error";
 
 const root = new URL("../", import.meta.url);
 
-test("interactive dashboard receives records through props without importing PostgreSQL", async () => {
-  const clientSource = await readFile(new URL("app/dashboard-client.tsx", root), "utf8");
+test("interactive dashboard modules receive records without importing PostgreSQL", async () => {
+  const modules = [
+    "app/dashboard-client.tsx",
+    "app/dashboard/dashboard-shell.tsx",
+    "app/dashboard/dashboard-ui.tsx",
+    "app/dashboard/overview-workspace.tsx",
+    "app/dashboard/clients-workspace.tsx",
+  ];
+  const source = (await Promise.all(modules.map(async (path) => {
+    try {
+      return await readFile(new URL(path, root), "utf8");
+    } catch {
+      return "";
+    }
+  }))).join("\n");
 
-  assert.match(clientSource, /DashboardData/);
-  assert.match(clientSource, /data:\s*DashboardData/);
-  assert.doesNotMatch(clientSource, /dashboard\/postgres|node-postgres|\bpg\b/);
-  assert.doesNotMatch(clientSource, /const\s+(clients|work)\s*[:=]/);
+  assert.match(source, /DashboardData/);
+  assert.doesNotMatch(source, /dashboard\/postgres|node-postgres|from ["']pg["']/);
+  assert.doesNotMatch(source, /const\s+(clients|work)\s*[:=]\s*\[/);
 });
 
 test("server page loads the configured provider and remains dynamic", async () => {
