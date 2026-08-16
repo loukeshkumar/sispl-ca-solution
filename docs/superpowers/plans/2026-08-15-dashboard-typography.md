@@ -13,6 +13,7 @@
 - Keep Geist Sans as the single interface typeface; use Geist Mono only for keyboard shortcuts or genuinely technical values.
 - Use 32px page titles, 30px hero statements, 17–18px card headings, 26px KPI values, 13–14px navigation/primary table text, 12px supporting text, and an 11px minimum for labels and compact metadata.
 - No visible interface text may be smaller than 11px after the final cascade.
+- Every stylesheet `font-size` declaration must itself be numeric or tokenized at 11px or larger, across grouped selectors, media rules, source positions, and `!important` declarations.
 - Do not change the existing layout, color palette, cards, gradients, data model, or interactions.
 - Preserve the Clients workspace as the typography reference and do not regress its current readable scale.
 - Do not add a runtime dependency.

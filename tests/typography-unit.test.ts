@@ -42,6 +42,16 @@ const resolveCssProperty = (source: string, selector: string, property: string, 
 
 const finalProperty = (selector: string, property: string) => resolveCssProperty(css, selector, property);
 
+const tokenSizes: Record<string, number> = {
+  "var(--type-page-title)": 32, "var(--type-hero)": 30, "var(--type-card-title)": 18, "var(--type-kpi)": 26,
+  "var(--type-nav)": 14, "var(--type-primary)": 13, "var(--type-supporting)": 12, "var(--type-label)": 11, "var(--type-compact)": 11,
+};
+const numericFontSize = (value: string) => tokenSizes[value] ?? Number(value.replace("px", ""));
+const assertFontSizeFloor = (source: string) => {
+  const root = postcss.parse(source);
+  root.walkDecls("font-size", (decl) => assert.ok(numericFontSize(decl.value.trim()) >= 11, `sub-11px font-size declaration: ${decl.value}`));
+};
+
 const finalFontSize = (selector: string) => finalProperty(selector, "font-size");
 
 const contrastRatio = (foreground: string, background: string) => {
@@ -116,7 +126,7 @@ test("Overview widgets use the readable typography tokens", () => {
     [".service-chips span", "var(--type-compact)"], [".client-health>b", "var(--type-compact)"], [".next-item b", "var(--type-compact)"],
     [".portfolio-owner b", "var(--type-compact)"], [".c360-cover p", "var(--type-compact)"], [".c360-tabs button", "var(--type-compact)"],
     [".c360-cover small", "var(--type-compact)"], [".c360-cover h2", "var(--type-card-title)"], [".c360-cover p", "var(--type-compact)"],
-    [".c360-tabs button", "var(--type-compact)"], [".profile-health span", "var(--type-compact)"], [".profile-health em", "var(--type-compact)"],
+    [".c360-cover>span", "13px"], [".c360-tabs button", "var(--type-compact)"], [".profile-health span", "var(--type-compact)"], [".profile-health b", "var(--type-kpi)"], [".profile-health b small", "var(--type-compact)"], [".profile-health em", "var(--type-compact)"],
     [".detail-label", "var(--type-compact)"], [".detail-grid small", "var(--type-compact)"], [".detail-grid b", "var(--type-compact)"],
     [".active-services>span", "var(--type-compact)"], [".active-services b", "var(--type-compact)"], [".next-action b", "var(--type-compact)"],
     [".next-action small", "var(--type-compact)"], [".next-action button", "var(--type-compact)"], [".c360-actions button", "var(--type-compact)"],
@@ -187,6 +197,8 @@ test("Overview widgets use the readable typography tokens", () => {
     [".detail-label", "#ffffff"],
     [".section-label", "#101d39"],
     [".firm-card small", "#1a2b4d"],
+    [".pulse-score>span", "#29285e"],
+    [".entity-cell em", "#ffffff"],
   ] as const) {
     const color = finalProperty(selector, "color");
     assert.match(color, /^#[0-9a-f]{6}$/i, `${selector} must use a hex color`);
@@ -201,6 +213,16 @@ test("Overview widgets use the readable typography tokens", () => {
     assert.match(color, /^#[0-9a-f]{6}$/i, `${selector} must use a hex color`);
     assert.ok(contrastRatio(color, background) >= 4.5, `${selector} color ${color} must meet WCAG AA contrast on ${background}`);
   }
+});
+
+test("all CSS font-size declarations enforce the 11px floor", () => {
+  assertFontSizeFloor(css);
+  for (const fixture of [
+    ".a,.b{font-size:10px}",
+    "@media(max-width:780px){.a{font-size:9px!important}}",
+    ".a{font-size:12px}.a{font-size:8px}",
+    ".scope .a{font-size:7px!important}",
+  ]) assert.throws(() => assertFontSizeFloor(fixture), /sub-11px/);
 });
 
 test("cascade resolver handles grouped rules, importance, media, specificity, and source order", () => {

@@ -29,6 +29,8 @@ Do not introduce a new font family. Do not redesign the cards, navigation, gradi
 
 The document body remains 15px on desktop and smaller screens. Form controls and buttons inherit Geist Sans.
 
+Every `font-size` declaration in the stylesheet, including grouped selectors, responsive rules, and important declarations, must resolve to a numeric or named-token value of at least 11px. This source invariant prevents a lower-size declaration from winning through cascade details.
+
 ## Component coverage
 
 The harmonized scale applies to:
