@@ -6,7 +6,7 @@ SISPL is a read-only practice command centre for Indian chartered accountants. T
 
 The same source tree has two explicit modes:
 
-- `demo` is the default. It uses deterministic fictitious records and is safe for Cloudflare Sites.
+- `demo` is the default. It uses deterministic fictitious records without requiring PostgreSQL.
 - `postgres` reads the local PostgreSQL database and never falls back to demo data when configuration, connection, or queries fail.
 
 Set local mode only in ignored `.env.local`:
@@ -26,7 +26,7 @@ Requirements: Node.js 22.13 or newer and PostgreSQL 16 or newer.
 npm ci
 cp .env.example .env.local
 npm run db:setup:local
-npm run dev:local
+npm run dev
 ```
 
 Open the URL printed by Next.js. See [LOCAL_SETUP.md](LOCAL_SETUP.md) for Windows, migration, testing, and troubleshooting details.
@@ -36,20 +36,11 @@ Open the URL printed by Next.js. See [LOCAL_SETUP.md](LOCAL_SETUP.md) for Window
 ```bash
 npm run test:unit
 npm run test:integration
-npm run build:local
+npm run build
 npm run lint
 ```
 
 `test:integration` requires `.env.local` and a migrated PostgreSQL database. It checks connectivity, repeated seeding, expected dashboard counts, and tenant isolation.
-
-The Cloudflare Sites path remains demonstration-only:
-
-```bash
-npm run build
-npm test
-```
-
-Those scripts use Bash/Linux utilities and are intended for WSL or the Sites build environment. The hosted Worker cannot reach PostgreSQL bound to a developer PC. A production database rollout requires a reachable PostgreSQL host, hosted secrets, Cloudflare Hyperdrive, authentication, and tenant authorization.
 
 ## Architecture
 
