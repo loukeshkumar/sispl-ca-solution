@@ -19,15 +19,15 @@ Do not introduce a new font family. Do not redesign the cards, navigation, gradi
 | Role | Size | Weight | Line height | Notes |
 | --- | ---: | ---: | ---: | --- |
 | Page title | 32px | 700 | 1.15 | Preserve tight display tracking |
-| Hero statement | 28px | 700 | 1.12 | Keep the violet emphasis treatment |
+| Hero statement | 30px | 700 | 1.12 | Keep the violet emphasis treatment |
 | Card heading | 17–18px | 600 | 1.3 | Used for queue, health, and deadline cards |
 | KPI value | 26px | 700 | 1.1 | Use tabular numerals where available |
-| Navigation and primary table text | 12–13px | 500–600 | 1.4 | Names and primary actions use 600 |
-| Supporting text | 10–11px | 400–500 | 1.45 | Increase contrast from the original pale gray |
-| Uppercase label | 9px minimum | 700 | 1.3 | Tracking must not exceed 0.12em |
-| Compact metadata | 9px minimum | 400–500 | 1.4 | No visible interface text below 9px |
+| Navigation and primary table text | 13–14px | 500–600 | 1.4 | Names and primary actions use 600 |
+| Supporting text | 12px | 400–500 | 1.45 | Increase contrast from the original pale gray |
+| Uppercase label | 11px | 700 | 1.3 | Tracking must not exceed 0.12em |
+| Compact metadata | 11px | 400–500 | 1.4 | No visible interface text below 11px |
 
-The document body remains 14px on desktop and 13px on smaller screens. Form controls and buttons inherit Geist Sans.
+The document body remains 15px on desktop and smaller screens. Form controls and buttons inherit Geist Sans.
 
 ## Component coverage
 
@@ -55,7 +55,7 @@ Implement the design in `app/globals.css` by extending the existing readability 
 
 ## Verification
 
-- Add a focused source-level regression test that confirms the global Geist stack, 9px minimum compact scale, and Overview selector coverage remain present.
+- Add a focused source-level regression test that confirms the global Geist stack, 11px minimum readable scale, and shared dashboard selector coverage remain present.
 - Run unit tests, TypeScript validation, and the native Next.js production build.
 - Confirm the Overview route renders without clipping and retains the existing card/grid composition.
 - Confirm the Clients workspace retains its current hierarchy.

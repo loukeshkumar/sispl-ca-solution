@@ -27,17 +27,19 @@ const contrastRatio = (foreground: string, background: string) => {
 test("dashboard typography uses one Geist stack and the approved scale", () => {
   assert.match(css, /body\{[^}]*font-family:var\(--font-geist-sans\)/);
   assert.doesNotMatch(css, /font-family:Arial,Helvetica,sans-serif/);
+  assert.equal(finalFontSize("body"), "15px");
+  assert.match(css, /@media\(max-width:780px\)\{body\{font-size:15px\}/);
 
   for (const token of [
     "--type-page-title:32px",
-    "--type-hero:28px",
+    "--type-hero:30px",
     "--type-card-title:18px",
     "--type-kpi:26px",
-    "--type-nav:13px",
-    "--type-primary:12px",
-    "--type-supporting:10px",
-    "--type-label:9px",
-    "--type-compact:9px",
+    "--type-nav:14px",
+    "--type-primary:13px",
+    "--type-supporting:12px",
+    "--type-label:11px",
+    "--type-compact:11px",
   ]) {
     assert.ok(css.includes(token), `missing approved typography token ${token}`);
   }
@@ -71,6 +73,22 @@ test("Overview widgets use the readable typography tokens", () => {
   assert.equal(finalFontSize(".title-row h1"), "var(--type-page-title)");
   assert.equal(finalFontSize(".clients-title h1"), "var(--type-page-title)");
   assert.equal(finalFontSize(".side nav button"), "var(--type-nav)");
+
+  for (const [name, rule] of [
+    ["sidebar details", /\.firm-card small,.section-label\{font-size:var\(--type-label\)/],
+    ["sidebar firm name", /\.firm-card b\{font-size:var\(--type-primary\)/],
+    ["sidebar firm metadata", /\.firm-card em\{font-size:var\(--type-supporting\)/],
+    ["sidebar support", /\.upgrade>b,.upgrade p,.upgrade button\{font-size:var\(--type-supporting\)/],
+    ["sidebar support copy", /\.upgrade>b,.upgrade p,.upgrade button\{font-size:var\(--type-supporting\)/],
+    ["account copy", /\.account b\{font-size:var\(--type-supporting\)/],
+    ["header controls", /\.global-search input,.fy,.add\{font-size:var\(--type-primary\)/],
+    ["hero support", /\.pulse-copy>p,.card-head p,.card-head>button\{font-size:var\(--type-supporting\)/],
+    ["client metrics", /\.client-metrics small,.portfolio-head\{font-size:var\(--type-label\)/],
+    ["portfolio details", /\.entity-cell b\{font-size:var\(--type-primary\)/],
+    ["client 360 details", /\.c360-cover small,.c360-cover p,.c360-tabs button,.profile-health span,.detail-label,.detail-grid small/],
+  ] as const) {
+    assert.match(css, rule, `${name} must use the approved readable scale`);
+  }
 
   for (const selector of [".client small", ".client-metrics small", ".entity-cell small", ".database-error-card small"] as const) {
     const color = finalProperty(selector, "color");

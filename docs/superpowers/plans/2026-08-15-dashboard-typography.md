@@ -11,8 +11,8 @@
 ## Global Constraints
 
 - Keep Geist Sans as the single interface typeface; use Geist Mono only for keyboard shortcuts or genuinely technical values.
-- Use 32px page titles, 28px hero statements, 17–18px card headings, 26px KPI values, 12–13px navigation/primary table text, 10–11px supporting text, and a 9px minimum for labels and compact metadata.
-- No visible interface text may be smaller than 9px after the final cascade.
+- Use 32px page titles, 30px hero statements, 17–18px card headings, 26px KPI values, 13–14px navigation/primary table text, 12px supporting text, and an 11px minimum for labels and compact metadata.
+- No visible interface text may be smaller than 11px after the final cascade.
 - Do not change the existing layout, color palette, cards, gradients, data model, or interactions.
 - Preserve the Clients workspace as the typography reference and do not regress its current readable scale.
 - Do not add a runtime dependency.
@@ -54,14 +54,14 @@ test("dashboard typography uses one Geist stack and the approved scale", () => {
 
   for (const token of [
     "--type-page-title:32px",
-    "--type-hero:28px",
+    "--type-hero:30px",
     "--type-card-title:18px",
     "--type-kpi:26px",
-    "--type-nav:13px",
+    "--type-nav:14px",
     "--type-primary:12px",
     "--type-supporting:10px",
-    "--type-label:9px",
-    "--type-compact:9px",
+    "--type-label:11px",
+    "--type-compact:11px",
   ]) {
     assert.ok(css.includes(token), `missing approved typography token ${token}`);
   }
@@ -99,14 +99,14 @@ Extend the existing `:root` declaration at the beginning of `app/globals.css` wi
 
 ```css
 --type-page-title:32px;
---type-hero:28px;
+--type-hero:30px;
 --type-card-title:18px;
 --type-kpi:26px;
---type-nav:13px;
+--type-nav:14px;
 --type-primary:12px;
 --type-supporting:10px;
---type-label:9px;
---type-compact:9px;
+--type-label:11px;
+--type-compact:11px;
 ```
 
 Replace the initial Arial body declaration with the complete global declaration below, then remove the duplicate body declaration currently under the `Readability scale` comment:
@@ -117,7 +117,7 @@ body{
   background:var(--canvas);
   color:var(--ink);
   font-family:var(--font-geist-sans),Inter,system-ui,-apple-system,"Segoe UI",sans-serif;
-  font-size:14px;
+  font-size:15px;
   -webkit-font-smoothing:antialiased;
   text-rendering:optimizeLegibility;
 }
@@ -198,7 +198,7 @@ Start the existing development server with `npm run dev`. On Overview and Client
 - The current card grid, sidebar width, gradients, and data density remain unchanged.
 - Clients retains its approved hierarchy and layout.
 
-If a compact panel clips, adjust only its minimum height or line height; do not shrink any approved text token below 9px.
+If a compact panel clips, adjust only its minimum height or line height; do not shrink any approved text token below 11px.
 
 - [ ] **Step 8: Commit only the typography implementation**
 
