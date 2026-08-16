@@ -58,8 +58,8 @@ test("dashboard typography uses one Geist stack and the approved scale", () => {
     "--type-card-title:18px",
     "--type-kpi:26px",
     "--type-nav:14px",
-    "--type-primary:12px",
-    "--type-supporting:10px",
+    "--type-primary:13px",
+    "--type-supporting:12px",
     "--type-label:11px",
     "--type-compact:11px",
   ]) {
@@ -103,8 +103,8 @@ Extend the existing `:root` declaration at the beginning of `app/globals.css` wi
 --type-card-title:18px;
 --type-kpi:26px;
 --type-nav:14px;
---type-primary:12px;
---type-supporting:10px;
+--type-primary:13px;
+--type-supporting:12px;
 --type-label:11px;
 --type-compact:11px;
 ```

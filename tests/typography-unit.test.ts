@@ -73,13 +73,24 @@ test("Overview widgets use the readable typography tokens", () => {
   assert.equal(finalFontSize(".title-row h1"), "var(--type-page-title)");
   assert.equal(finalFontSize(".clients-title h1"), "var(--type-page-title)");
   assert.equal(finalFontSize(".side nav button"), "var(--type-nav)");
+  for (const [selector, token] of [
+    [".logo small", "var(--type-compact)"],
+    [".side nav em", "var(--type-compact)"],
+    [".title-row>div:first-child>p", "var(--type-label)"],
+    [".clients-title p", "var(--type-label)"],
+    [".portfolio-tools>div button", "var(--type-compact)"],
+    [".filter-btn", "var(--type-compact)"],
+    [".profile-health em", "var(--type-compact)"],
+    [".database-error-card>span", "var(--type-compact)"],
+  ] as const) {
+    assert.equal(finalFontSize(selector), token, `${selector} must use ${token}`);
+  }
 
   for (const [name, rule] of [
     ["sidebar details", /\.firm-card small,.section-label\{font-size:var\(--type-label\)/],
     ["sidebar firm name", /\.firm-card b\{font-size:var\(--type-primary\)/],
     ["sidebar firm metadata", /\.firm-card em\{font-size:var\(--type-supporting\)/],
     ["sidebar support", /\.upgrade>b,.upgrade p,.upgrade button\{font-size:var\(--type-supporting\)/],
-    ["sidebar support copy", /\.upgrade>b,.upgrade p,.upgrade button\{font-size:var\(--type-supporting\)/],
     ["account copy", /\.account b\{font-size:var\(--type-supporting\)/],
     ["header controls", /\.global-search input,.fy,.add\{font-size:var\(--type-primary\)/],
     ["hero support", /\.pulse-copy>p,.card-head p,.card-head>button\{font-size:var\(--type-supporting\)/],

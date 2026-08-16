@@ -109,3 +109,12 @@ body{font-size:15px}
 .database-error-card small{font-size:var(--type-compact)}
 .entity-cell b{font-size:var(--type-primary)}
 .client-metrics em{font-size:var(--type-supporting)}
+.logo small{font-size:var(--type-compact)}
+.side nav em{font-size:var(--type-compact)}
+.title-row>div:first-child>p,.clients-title p{font-size:var(--type-label)}
+.portfolio-tools>div button{font-size:var(--type-compact)}
+.filter-btn{font-size:var(--type-compact)}
+.profile-health em{font-size:var(--type-compact)}
+.database-error-card>span{font-size:var(--type-compact)}
+.title-row>div:first-child>p{font-size:var(--type-label)}
+.clients-title p{font-size:var(--type-label)}
