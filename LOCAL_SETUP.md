@@ -7,7 +7,7 @@
 - PostgreSQL 16 or newer
 - A PostgreSQL role allowed to create tables in the selected database
 
-Standard local Next.js commands work in PowerShell, Command Prompt, macOS, Linux, and WSL. The Cloudflare Sites verification scripts use Bash and GNU utilities; on Windows, run those commands inside WSL 2.
+Standard Next.js commands work in PowerShell, Command Prompt, macOS, Linux, and WSL.
 
 ## 1. Install dependencies
 
@@ -53,7 +53,7 @@ npm run db:check:local
 ## 5. Start the local application
 
 ```bash
-npm run dev:local
+npm run dev
 ```
 
 The dashboard badge reads `LOCAL DATABASE` in PostgreSQL mode. If the connection is unavailable, the app shows a safe retry screen and does not substitute demonstration data.
@@ -63,28 +63,18 @@ The dashboard badge reads `LOCAL DATABASE` in PostgreSQL mode. If the connection
 ```bash
 npm run test:unit
 npm run test:integration
-npm run build:local
-npm run start:local
+npm run build
+npm run start
 ```
 
 The integration suite executes a basic query, seeds twice, checks stable row counts, loads the seeded dashboard, and verifies that a different tenant id cannot see seeded client or work rows.
 
-## Demonstration mode and Sites
+## Demonstration mode
 
-Remove `SISPL_DATA_SOURCE` or set it to `demo` to use deterministic representative data without PostgreSQL. Hosted Sites intentionally uses this mode because a Cloudflare Worker cannot connect to a database bound to a local PC.
-
-From WSL/Linux, validate that path with:
-
-```bash
-npm run build
-npm test
-```
-
-Production PostgreSQL hosting is a separate milestone requiring a network-reachable database, Hyperdrive, managed secrets, authentication, and membership/RBAC enforcement.
+Remove `SISPL_DATA_SOURCE` or set it to `demo` to use deterministic representative data without PostgreSQL.
 
 ## Troubleshooting
 
 - `DATABASE_URL is required`: create `.env.local` from `.env.example`.
 - Database unavailable screen: confirm PostgreSQL is running, the host/port is reachable, and the role can access `sispl_ca_solution`; then run `npm run db:check:local`.
 - Missing tables: run `npm run db:migrate:local`, then the check again.
-- `node: not found` from a Bash Sites script on Windows: run the Sites script in a WSL shell with Node installed inside WSL; use `build:local` for native Windows verification.
