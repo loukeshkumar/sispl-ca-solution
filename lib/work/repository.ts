@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, asc, eq, ne, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, ne, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 import {
@@ -12,6 +12,7 @@ import {
 } from "../../db/schema";
 import type { DashboardDatabase } from "../dashboard/postgres/repository";
 import { isServiceEntitled, listEntitledServices } from "../packages/repository";
+import { planBulkChange, type BulkAction, type BulkPlan } from "./bulk";
 import { workServiceEntitlementCode, type WorkInput } from "./validation";
 
 const assigneeUsers = alias(users, "work_assignee");
@@ -306,4 +307,58 @@ export function workEditorFrom(item: Work360Data | null): WorkEditorData | null 
 
 export async function getWorkItemEditor(database: DashboardDatabase, tenantId: string, workItemId: string): Promise<WorkEditorData | null> {
   return workEditorFrom(await getWorkItem360(database, tenantId, workItemId));
+}
+
+/**
+ * Applies one change across many work items. The whole selection is validated
+ * first, so the caller can report exactly what was skipped and why, and the
+ * valid subset commits together — never a half-applied batch.
+ */
+export async function applyBulkWorkChange(
+  database: DashboardDatabase,
+  tenantId: string,
+  actorUserId: string,
+  workItemIds: string[],
+  action: BulkAction,
+): Promise<BulkPlan> {
+  if (!tenantId.trim() || !actorUserId.trim()) throw new Error("Tenant and actor are required.");
+  if (!workItemIds.length) return { apply: [], skip: [] };
+  return database.transaction(async (transaction) => {
+    if (action.kind === "assignee" || action.kind === "reviewer") {
+      await assertActiveMember(transaction, tenantId, action.memberId);
+    }
+    const current = await transaction.select({
+      assigneeId: workItems.assigneeId,
+      blockerNote: workItems.blockerNote,
+      id: workItems.id,
+      internalDueDate: workItems.internalDueDate,
+      reviewerId: workItems.reviewerId,
+      statutoryDueDate: workItems.statutoryDueDate,
+    }).from(workItems).where(and(
+      eq(workItems.tenantId, tenantId),
+      inArray(workItems.id, workItemIds),
+      ne(workItems.status, "completed"),
+    )).for("update");
+
+    const plan = planBulkChange(current, action);
+    for (const item of plan.apply) {
+      const set = action.kind === "assignee" ? { assigneeId: action.memberId }
+        : action.kind === "reviewer" ? { reviewerId: action.memberId }
+        : action.kind === "internalDue" ? { internalDueDate: item.internalDueDate! }
+        : { status: action.status };
+      await transaction.update(workItems).set({ ...set, updatedAt: new Date() })
+        .where(and(eq(workItems.id, item.id), eq(workItems.tenantId, tenantId), ne(workItems.status, "completed")));
+      // One event per item so Work Item 360 history stays per-item rather than
+      // showing one opaque "bulk edit".
+      await transaction.insert(auditEvents).values({
+        tenantId,
+        actorUserId,
+        resourceType: "work_item",
+        resourceId: item.id,
+        action: `work.bulk.${action.kind}`,
+        reason: "Changed from a My Work bulk action",
+      });
+    }
+    return plan;
+  });
 }

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { planBulkChange, type BulkPlanCandidate } from "../lib/work/bulk";
 import { burnPercentage, capacityHorizonWeeks, remainingBudgetMinutes, weeklyAvailableMinutes, weekStartKey, workingDaysInMask } from "../lib/work/capacity";
 import { DEFAULT_WORK_QUEUE_PARAMS, parseWorkQueueParams, workQueueHref, WORK_QUEUE_PRESETS } from "../lib/work/queue-params";
 
@@ -98,4 +99,55 @@ test("burn percentage is null when no budget exists, so the view can say so", ()
   assert.equal(burnPercentage(0, 90), 0);
   assert.equal(burnPercentage(45, 90), 50);
   assert.equal(burnPercentage(180, 90), 200);
+});
+
+const candidate = (over: Partial<BulkPlanCandidate> = {}): BulkPlanCandidate => ({
+  assigneeId: "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa",
+  blockerNote: "",
+  id: "11111111-1111-4111-8111-111111111111",
+  internalDueDate: "2026-08-17",
+  reviewerId: null,
+  statutoryDueDate: "2026-08-20",
+  ...over,
+});
+
+test("bulk reassign skips items where the new assignee already reviews them", () => {
+  const reviewer = "bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb";
+  const plan = planBulkChange(
+    [candidate(), candidate({ id: "22222222-2222-4222-8222-222222222222", reviewerId: reviewer })],
+    { kind: "assignee", memberId: reviewer },
+  );
+  assert.equal(plan.apply.length, 1);
+  assert.equal(plan.skip.length, 1);
+  assert.match(plan.skip[0]!.reason, /already reviews/i);
+});
+
+test("shifting the internal date never crosses the statutory date", () => {
+  const plan = planBulkChange([candidate(), candidate({ id: "33333333-3333-4333-8333-333333333333", internalDueDate: "2026-08-19" })], { kind: "internalDue", shiftDays: 3 });
+  assert.equal(plan.apply.length, 1);
+  assert.equal(plan.apply[0]!.internalDueDate, "2026-08-20");
+  assert.match(plan.skip[0]!.reason, /statutory/i);
+});
+
+test("shifting an item with no internal date starts from its statutory date", () => {
+  const plan = planBulkChange([candidate({ internalDueDate: null })], { kind: "internalDue", shiftDays: -2 });
+  assert.equal(plan.apply[0]!.internalDueDate, "2026-08-18");
+});
+
+test("bulk status cannot complete work", () => {
+  assert.throws(() => planBulkChange([candidate()], { kind: "status", status: "completed" as never }), /completed/i);
+});
+
+test("bulk status to waiting requires a recorded dependency", () => {
+  const plan = planBulkChange(
+    [candidate(), candidate({ id: "44444444-4444-4444-8444-444444444444", blockerNote: "Awaiting bank statements" })],
+    { kind: "status", status: "waiting" },
+  );
+  assert.equal(plan.apply.length, 1);
+  assert.equal(plan.apply[0]!.id, "44444444-4444-4444-8444-444444444444");
+  assert.match(plan.skip[0]!.reason, /dependency/i);
+});
+
+test("an empty selection plans nothing rather than throwing", () => {
+  assert.deepEqual(planBulkChange([], { kind: "assignee", memberId: null }), { apply: [], skip: [] });
 });
