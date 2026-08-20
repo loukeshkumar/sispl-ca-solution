@@ -4,6 +4,20 @@
 
 Build a secure multi-firm SaaS for Indian CA practices. Each tenant receives isolated client, compliance, document, work, billing and audit data.
 
+## Current implementation checkpoint (16 August 2026)
+
+This file is the product roadmap, not a statement that every milestone is complete. The local application currently delivers:
+
+- Milestones 1 and 2 as working vertical slices: responsive workspace shell, PostgreSQL tenancy, authentication, RBAC, sessions, audit events, migrations, and isolated integration tests.
+- Milestone 3 as a focused client lifecycle: create, edit, Client 360, guarded archive, services, registrations, ownership, and portfolio health.
+- Partial Milestones 4, 5, and 6: manually managed compliance work, employee profiles and access provisioning, general/client/compliance-linked office tasks, attendance and leave controls, salary/payroll control, client service packages, assignment and self-service task states, completion, calendar, document requests, validated private uploads, and authenticated downloads.
+
+Still planned: template/rule versioning, task dependencies, document versions/evidence chains, statutory-domain engines, production object storage, and external integrations. These must not be presented as implemented capabilities. Compliance recurrence (`lib/compliance/recurrence.ts`, 45-day lookahead) and notification dispatch (`lib/notifications/`) now ship and run from `npm run jobs:daily:local`.
+
+**Settings → Service Management** maintains the tenant-wide service master. **Package Setup** builds reusable package definitions from that master, and **Client Packages** assigns one effective base package plus optional add-ons to each legal entity. Each assignment stores an immutable snapshot of commercial terms and services; package management does not create invoices or replace the planned billing milestone.
+
+**Settings → User Roles Management** separates access into one sealed, tenant-scoped Super Admin class, Super Admin-created delegated Admin roles, and reusable Employee-category roles. Permission changes are audited and revoke affected sessions; Employee Management can assign Admin roles only when the actor is Super Admin.
+
 ## Technology target
 
 - Next.js App Router, React, TypeScript and Tailwind CSS
