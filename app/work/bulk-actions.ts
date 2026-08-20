@@ -4,11 +4,8 @@ import { revalidatePath } from "next/cache";
 
 import { requirePermission } from "../../lib/auth/server";
 import { getDatabase } from "../../lib/dashboard/postgres/pool";
-import { BULK_STATUSES, type BulkAction } from "../../lib/work/bulk";
+import { BULK_STATUSES, emptyBulkActionState, type BulkAction, type BulkActionState } from "../../lib/work/bulk";
 import { applyBulkWorkChange } from "../../lib/work/repository";
-
-export type BulkActionState = { applied: number; error: string; skipped: Array<{ id: string; reason: string }> };
-export const emptyBulkActionState: BulkActionState = { applied: 0, error: "", skipped: [] };
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 

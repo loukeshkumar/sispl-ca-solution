@@ -12,6 +12,14 @@ export type BulkPlanCandidate = Pick<WorkQueueRow, "assigneeId" | "blockerNote" 
 export type BulkPlanItem = { id: string; internalDueDate?: string | null };
 export type BulkPlan = { apply: BulkPlanItem[]; skip: Array<{ id: string; reason: string }> };
 
+/**
+ * Lives here rather than beside the Server Action: a "use server" module may
+ * only export async functions, so a constant declared there is stripped and
+ * reaches the client as undefined.
+ */
+export type BulkActionState = { applied: number; error: string; skipped: Array<{ id: string; reason: string }> };
+export const emptyBulkActionState: BulkActionState = { applied: 0, error: "", skipped: [] };
+
 const DAY_MS = 86_400_000;
 
 function shiftDateKey(dateKey: string, days: number) {

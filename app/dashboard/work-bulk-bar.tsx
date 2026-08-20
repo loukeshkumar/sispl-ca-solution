@@ -2,8 +2,9 @@
 
 import { useActionState, useState } from "react";
 
+import { emptyBulkActionState } from "../../lib/work/bulk";
 import type { WorkMemberOption } from "../../lib/work/repository";
-import { applyBulkWorkAction, emptyBulkActionState } from "../work/bulk-actions";
+import { applyBulkWorkAction } from "../work/bulk-actions";
 
 const KINDS = [
   { key: "assignee", label: "Reassign" },
