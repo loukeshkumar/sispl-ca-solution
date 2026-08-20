@@ -13128,3 +13128,124 @@ button.kpi-card[aria-pressed="true"] {
     padding: 4px 14px 16px;
   }
 }
+
+/* ---- Compliance oversight: gaps, matrix, evidence ---- */
+
+.compliance-service-filter {
+  margin-bottom: 18px;
+  overflow-x: auto;
+}
+
+.compliance-gap-list {
+  display: grid;
+  padding: 0 20px 20px;
+}
+
+.compliance-gap-row {
+  align-items: center;
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(200px, 2fr) minmax(140px, 1fr) auto;
+  padding: 14px 0;
+}
+
+.compliance-gap-row span {
+  display: grid;
+  gap: 3px;
+}
+
+.compliance-gap-row small {
+  color: var(--muted);
+  font-size: var(--type-compact);
+}
+
+.compliance-gap-readonly {
+  color: var(--muted);
+  font-size: var(--type-compact);
+}
+
+.compliance-evidence small {
+  font-size: var(--type-compact);
+}
+
+.compliance-evidence .is-evidenced {
+  color: var(--mint);
+  font-weight: 600;
+}
+
+.compliance-evidence .is-missing {
+  color: var(--red);
+  font-weight: 600;
+}
+
+.compliance-evidence .is-pending {
+  color: var(--muted);
+}
+
+.compliance-matrix {
+  --periods: 6;
+  min-width: 640px;
+}
+
+.compliance-matrix-head,
+.compliance-matrix-row {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(9rem, 1.4fr) repeat(var(--periods), minmax(5.5rem, 1fr));
+}
+
+.compliance-matrix-head {
+  color: var(--muted);
+  font-size: var(--type-compact);
+  padding-bottom: 8px;
+}
+
+.compliance-matrix-row {
+  align-items: center;
+  border-top: 1px solid var(--line);
+  padding: 8px 0;
+}
+
+.compliance-matrix-name {
+  font-weight: 600;
+}
+
+.compliance-matrix-cell {
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--ink);
+  display: flex;
+  font-size: var(--type-compact);
+  justify-content: center;
+  min-height: 38px;
+  padding: 6px;
+  text-decoration: none;
+  text-transform: capitalize;
+}
+
+.compliance-matrix-cell.is-red { background: var(--red-soft); border-color: var(--red); color: var(--red); }
+.compliance-matrix-cell.is-amber { background: var(--amber-soft); border-color: var(--amber); color: var(--amber); }
+.compliance-matrix-cell.is-blue { background: var(--blue-soft); border-color: var(--blue); color: var(--blue); }
+.compliance-matrix-cell.is-mint { background: var(--mint-soft); border-color: var(--mint); color: var(--mint); }
+
+/* A hole in the grid is an obligation nobody raised, not an empty style. */
+.compliance-matrix-cell.is-none {
+  background: repeating-linear-gradient(45deg, var(--input-surface), var(--input-surface) 5px, #fff 5px, #fff 10px);
+  color: var(--muted);
+}
+
+.compliance-health-card > a {
+  align-items: center;
+  color: inherit;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(80px, 1fr) minmax(90px, 2fr) auto;
+  padding: 8px 0;
+  text-decoration: none;
+}
+
+.compliance-health-card > a:hover {
+  color: var(--violet);
+}

@@ -38,7 +38,7 @@ import {
   PackageRepositoryError, updatePackage, updateService,
 } from "../lib/packages/repository";
 import { createRoleDefinition, getRoleDefinitionEditorData, RoleRepositoryError, updateRoleDefinition } from "../lib/roles/repository";
-import { generateRecurringWorkItems } from "../lib/compliance/repository";
+import { generateRecurringWorkItems, listCoverageGaps, listEntitlementWindows, listEvidencedWorkItemIds, raiseCoverageGap } from "../lib/compliance/repository";
 import { BillingRepositoryError, cancelInvoice, createInvoice, getInvoiceDetail, issueInvoice, recordInvoicePayment } from "../lib/billing/repository";
 import { generateDeadlineNotifications } from "../lib/notifications/repository";
 import {
@@ -1806,4 +1806,89 @@ test("completing a non-repeating to-do creates nothing", async () => {
   } finally {
     await database.delete(personalTodos).where(and(eq(personalTodos.tenantId, identity.tenantId), eq(personalTodos.title, title)));
   }
+});
+
+test("coverage never reports obligations from before a client was engaged", async () => {
+  const database = getDatabase();
+  await seedDevelopmentData(database);
+  const identity = await findLoginIdentity(database, "loukesh@example.invalid", "sharma-kumar-ca");
+  assert.ok(identity);
+  const setup = await listPackageSetupWorkspace(database, identity.tenantId);
+  const gst = setup.services.find((service) => service.code === "GST");
+  assert.ok(gst, "the seed provides a GST service");
+  const [client] = await database.select({ id: legalEntities.id }).from(legalEntities).where(and(
+    eq(legalEntities.tenantId, identity.tenantId), eq(legalEntities.status, "active"),
+  )).limit(1);
+  assert.ok(client);
+  const suffix = randomUUID().slice(0, 6).toUpperCase();
+  let packageId = "";
+  let assignmentId = "";
+
+  try {
+    packageId = await createPackage(database, identity.tenantId, identity.userId, {
+      billingCycle: "monthly", code: `COV${suffix}`, description: "", name: `Coverage ${suffix}`,
+      serviceIds: [gst.id], standardFeePaise: 100000, status: "active",
+    });
+    // Engaged from 1 August only.
+    assignmentId = await assignClientPackage(database, identity.tenantId, identity.userId, {
+      addonServiceIds: [], agreedFeePaise: 100000, effectiveFrom: "2026-08-01",
+      effectiveTo: null, legalEntityId: client.id, packageId, replaceExisting: false,
+    });
+
+    const gaps = await listCoverageGaps(database, identity.tenantId, "2026-08-21", 400);
+    assert.ok(gaps.length > 0, "an engaged client with no raised work produces gaps");
+    // The whole point: today's entitlement must not be projected backwards.
+    assert.deepEqual(
+      gaps.filter((gap) => gap.statutoryDueDate < "2026-08-01"),
+      [],
+      "no obligation may be reported for a period that fell due before engagement",
+    );
+    assert.ok(gaps.every((gap) => gap.legalEntityId === client.id));
+
+    // Raising one removes it, and raising it twice creates nothing extra.
+    const target = gaps[0]!;
+    const raisedId = await raiseCoverageGap(database, identity.tenantId, identity.userId, target);
+    assert.ok(raisedId, "the first raise creates the obligation");
+    assert.equal(
+      await raiseCoverageGap(database, identity.tenantId, identity.userId, target),
+      null,
+      "a second raise is absorbed by the unique constraint rather than duplicating",
+    );
+    const after = await listCoverageGaps(database, identity.tenantId, "2026-08-21", 400);
+    assert.equal(after.length, gaps.length - 1, "the raised obligation is no longer a gap");
+    const [{ value: audited }] = await database.select({ value: count() }).from(auditEvents).where(and(
+      eq(auditEvents.tenantId, identity.tenantId), eq(auditEvents.action, "work_item.raised_from_gap"),
+    ));
+    assert.equal(audited, 1, "one audit event, not two");
+  } finally {
+    await database.delete(auditEvents).where(and(eq(auditEvents.tenantId, identity.tenantId), eq(auditEvents.action, "work_item.raised_from_gap")));
+    await database.delete(workItems).where(and(eq(workItems.tenantId, identity.tenantId), eq(workItems.blockerNote, "Raised from a compliance coverage gap.")));
+    if (assignmentId) {
+      await database.delete(clientPackageAssignmentServices).where(eq(clientPackageAssignmentServices.assignmentId, assignmentId));
+      await database.delete(clientPackageAssignments).where(eq(clientPackageAssignments.id, assignmentId));
+    }
+    if (packageId) {
+      await database.delete(servicePackageItems).where(eq(servicePackageItems.packageId, packageId));
+      await database.delete(servicePackages).where(eq(servicePackages.id, packageId));
+    }
+  }
+});
+
+test("coverage and entitlement windows never cross a tenant boundary", async () => {
+  const database = getDatabase();
+  await seedDevelopmentData(database);
+  const identity = await findLoginIdentity(database, "loukesh@example.invalid", "sharma-kumar-ca");
+  assert.ok(identity);
+  const windows = await listEntitlementWindows(database, identity.tenantId);
+  const foreign = await database.select({ id: legalEntities.id }).from(legalEntities).where(ne(legalEntities.tenantId, identity.tenantId));
+  assert.deepEqual(
+    windows.filter((row) => foreign.some((other) => other.id === row.legalEntityId)),
+    [],
+    "no other tenant's entitlement may be read",
+  );
+  const gaps = await listCoverageGaps(database, identity.tenantId, "2026-08-21", 400);
+  assert.deepEqual(gaps.filter((gap) => foreign.some((other) => other.id === gap.legalEntityId)), []);
+  const evidenced = await listEvidencedWorkItemIds(database, identity.tenantId);
+  const foreignWork = await database.select({ id: workItems.id }).from(workItems).where(ne(workItems.tenantId, identity.tenantId));
+  assert.deepEqual([...evidenced].filter((id) => foreignWork.some((other) => other.id === id)), []);
 });
