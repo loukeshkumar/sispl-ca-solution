@@ -34,10 +34,11 @@ import type { LoadStripDay } from "../lib/todos/recurrence";
 import { listCoverageGaps, listEvidencedWorkItemIds, type CoverageGap } from "../lib/compliance/repository";
 import { DEFAULT_COMPLIANCE_PARAMS, parseComplianceParams } from "../lib/compliance/queue-params";
 import { DEFAULT_REGISTER_PARAMS, parseRegisterParams } from "../lib/registers/queue-params";
+import { DEFAULT_DOCUMENT_PARAMS, parseDocumentParams } from "../lib/documents/queue-params";
 
 export const dynamic = "force-dynamic";
 
-export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ attendancePeriod?: string; budget?: string; category?: string; estimate?: string; evidence?: string; tab?: string; filter?: string; layout?: string; owner?: string; priority?: string; q?: string; registerError?: string; saved?: string; scope?: string; service?: string; sort?: string; timesheetError?: string; view?: string; workspace?: string }> }) {
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ attendancePeriod?: string; budget?: string; category?: string; estimate?: string; evidence?: string; filter?: string; layout?: string; owner?: string; priority?: string; q?: string; registerError?: string; saved?: string; scope?: string; service?: string; sort?: string; tab?: string; timesheetError?: string; view?: string; workspace?: string }> }) {
   const source = resolveDataSource(process.env);
   const query = await searchParams;
   const workspace = query.workspace;
@@ -81,6 +82,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   let complianceGaps: CoverageGap[] = [];
   let complianceEvidenced: string[] = [];
   const registerParams = parseRegisterParams(query as Record<string, string | undefined>);
+  const documentParams = parseDocumentParams(query as Record<string, string | undefined>);
 
   if (source === "postgres") {
     const session = await requirePermission("dashboard:read");
@@ -151,6 +153,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         billing={billingWorkspace}
         insights={insightsWorkspace}
         registerOptions={registerOptions}
+        documentParams={documentParams}
         registerParams={registerParams}
         registers={registersWorkspace}
         registerError={query.registerError}
@@ -193,5 +196,5 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   registersWorkspace.todayKey = data.todayKey;
   timesheetWorkspace.todayKey = data.todayKey;
   insightsWorkspace.todayKey = data.todayKey;
-  return <DashboardClient compliance={{ canWrite: false, data, evidenced: [], gaps: [], params: DEFAULT_COMPLIANCE_PARAMS, rows: [], services: [], todayKey: data.todayKey }} todoQueue={{ loadStrip: [], params: DEFAULT_TODO_QUEUE_PARAMS, todos: filterTodoQueue(todoWorkspace.todos, DEFAULT_TODO_QUEUE_PARAMS, todoWorkspace.todayKey), workspace: todoWorkspace }} taskQueue={{ canAssign: false, canManageAll: false, lanes: [], members: [], params: DEFAULT_TASK_QUEUE_PARAMS, rows: [], todayKey: data.todayKey, totals: { dueToday: 0, overdue: 0, review: 0, waiting: 0 } }} workQueue={{ canWrite: false, lanes: [], members: [], params: DEFAULT_WORK_QUEUE_PARAMS, rows: [], todayKey: data.todayKey, totals: { active: 0, overdue: 0, review: 0, waiting: 0 } }} attendance={attendanceWorkspace} billing={billingWorkspace} insights={insightsWorkspace} registerOptions={registerOptions} registerParams={DEFAULT_REGISTER_PARAMS} registers={registersWorkspace} timesheetOptions={timesheetOptions} timesheets={timesheetWorkspace} clientDocuments={clientDocuments} clientPackages={clientPackageWorkspace} data={data} documents={documentWorkspace} employees={employees} initialWorkspace={initialWorkspace} key={initialWorkspace} packageSetup={packageSetupWorkspace} roleManagement={roleManagementWorkspace} roleSaved={query.saved} salary={salaryWorkspace} serviceManagement={serviceManagementWorkspace} todos={todoWorkspace} />;
+  return <DashboardClient compliance={{ canWrite: false, data, evidenced: [], gaps: [], params: DEFAULT_COMPLIANCE_PARAMS, rows: [], services: [], todayKey: data.todayKey }} todoQueue={{ loadStrip: [], params: DEFAULT_TODO_QUEUE_PARAMS, todos: filterTodoQueue(todoWorkspace.todos, DEFAULT_TODO_QUEUE_PARAMS, todoWorkspace.todayKey), workspace: todoWorkspace }} taskQueue={{ canAssign: false, canManageAll: false, lanes: [], members: [], params: DEFAULT_TASK_QUEUE_PARAMS, rows: [], todayKey: data.todayKey, totals: { dueToday: 0, overdue: 0, review: 0, waiting: 0 } }} workQueue={{ canWrite: false, lanes: [], members: [], params: DEFAULT_WORK_QUEUE_PARAMS, rows: [], todayKey: data.todayKey, totals: { active: 0, overdue: 0, review: 0, waiting: 0 } }} attendance={attendanceWorkspace} billing={billingWorkspace} insights={insightsWorkspace} registerOptions={registerOptions} documentParams={DEFAULT_DOCUMENT_PARAMS} registerParams={DEFAULT_REGISTER_PARAMS} registers={registersWorkspace} timesheetOptions={timesheetOptions} timesheets={timesheetWorkspace} clientDocuments={clientDocuments} clientPackages={clientPackageWorkspace} data={data} documents={documentWorkspace} employees={employees} initialWorkspace={initialWorkspace} key={initialWorkspace} packageSetup={packageSetupWorkspace} roleManagement={roleManagementWorkspace} roleSaved={query.saved} salary={salaryWorkspace} serviceManagement={serviceManagementWorkspace} todos={todoWorkspace} />;
 }

@@ -3461,6 +3461,11 @@ button.kpi-card[aria-pressed="true"] {
   align-items: center;
   display: grid;
   gap: 16px;
+  /* Five children when selection is available, four when it is not. */
+  grid-template-columns: auto minmax(200px, 1fr) minmax(110px, .35fr) auto minmax(105px, auto);
+}
+
+.document-request-row:not(:has(.document-row-select)) {
   grid-template-columns: minmax(220px, 1fr) minmax(110px, .35fr) auto minmax(105px, auto);
   min-height: 92px;
   padding: 15px 20px;
@@ -13340,4 +13345,80 @@ button.kpi-card[aria-pressed="true"] {
   .register-attention-row > a {
     grid-column: 2;
   }
+}
+
+/* ---- Documents: selection and the per-client chase lens ---- */
+
+.document-row-select {
+  align-items: center;
+  display: inline-flex;
+}
+
+.document-row-select input,
+.document-client-item input {
+  height: 18px;
+  width: 18px;
+}
+
+.document-bulk-label {
+  color: var(--muted);
+  font-size: var(--type-compact);
+}
+
+.document-client-groups {
+  display: grid;
+  gap: 14px;
+  padding: 0 20px 20px;
+}
+
+.document-client-group {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.document-client-group > header {
+  align-items: baseline;
+  background: var(--input-surface);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 10px 14px;
+}
+
+.document-client-group > header em {
+  color: var(--violet);
+  font-style: normal;
+  font-weight: 600;
+  font-size: var(--type-compact);
+}
+
+.document-client-group > header small {
+  color: var(--muted);
+  font-size: var(--type-compact);
+  margin-left: auto;
+}
+
+.document-client-item {
+  align-items: center;
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 12px;
+  grid-template-columns: auto 1fr auto;
+  padding: 10px 14px;
+}
+
+.document-client-item:first-of-type {
+  border-top: none;
+}
+
+.document-client-item span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.document-client-item small {
+  color: var(--muted);
+  font-size: var(--type-compact);
 }
