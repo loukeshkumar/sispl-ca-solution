@@ -12,7 +12,7 @@ import {
 } from "../../db/schema";
 import type { DashboardDatabase } from "../dashboard/postgres/repository";
 import type { WorkStatus } from "../dashboard/types";
-import { capacityHorizonWeeks, remainingBudgetMinutes, weeklyAvailableMinutes, weekStartKey } from "./capacity";
+import { capacityHorizonWeeks, remainingBudgetMinutes, weeklyAvailableMinutes, weekStartKey } from "../scheduling/capacity";
 import { UNASSIGNED_OWNER, type WorkQueueParams, type WorkScope } from "./queue-params";
 
 const STATUS_LABELS: Record<string, WorkStatus> = {

@@ -403,6 +403,9 @@ export const officeTasks = pgTable("office_tasks", {
   blockerNote: text("blocker_note").notNull().default(""),
   legalEntityId: uuid("legal_entity_id"),
   workItemId: uuid("work_item_id"),
+  // Typed per task: office tasks are not catalogue-driven, so there is no
+  // service standard to inherit. Null means the task is unestimated.
+  estimateMinutes: integer("estimate_minutes"),
   completedAt: timestamp("completed_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -415,11 +418,14 @@ export const officeTasks = pgTable("office_tasks", {
   foreignKey({ name: "office_tasks_work_entity_tenant_fk", columns: [table.tenantId, table.workItemId, table.legalEntityId], foreignColumns: [workItems.tenantId, workItems.id, workItems.legalEntityId] }),
   index("office_tasks_assignee_status_due_idx").on(table.tenantId, table.assigneeId, table.status, table.dueDate),
   index("office_tasks_status_due_idx").on(table.tenantId, table.status, table.dueDate),
+  index("office_tasks_reviewer_idx").on(table.tenantId, table.reviewerId, table.status),
+  index("office_tasks_assigner_idx").on(table.tenantId, table.assignedByUserId, table.status),
   check("office_tasks_priority_check", sql`${table.priority} in ('low', 'normal', 'high', 'urgent')`),
   check("office_tasks_status_check", sql`${table.status} in ('todo', 'in_progress', 'waiting', 'review', 'completed', 'cancelled')`),
   check("office_tasks_reviewer_separation_check", sql`${table.reviewerId} is null or ${table.reviewerId} <> ${table.assigneeId}`),
   check("office_tasks_waiting_note_check", sql`${table.status} <> 'waiting' or length(trim(${table.blockerNote})) > 0`),
   check("office_tasks_work_client_check", sql`${table.workItemId} is null or ${table.legalEntityId} is not null`),
+  check("office_tasks_estimate_minutes_check", sql`${table.estimateMinutes} is null or ${table.estimateMinutes} between 1 and 100000`),
   check("office_tasks_completed_state_check", sql`(${table.status} = 'completed' and ${table.completedAt} is not null) or (${table.status} <> 'completed' and ${table.completedAt} is null)`),
 ]);
 
@@ -1241,6 +1247,7 @@ export const timeEntries = pgTable("time_entries", {
   index("time_entries_employee_date_idx").on(table.tenantId, table.employeeUserId, table.entryDate),
   index("time_entries_entity_date_idx").on(table.tenantId, table.legalEntityId, table.entryDate),
   index("time_entries_work_idx").on(table.tenantId, table.workItemId),
+  index("time_entries_task_idx").on(table.tenantId, table.officeTaskId),
   check("time_entries_minutes_check", sql`${table.minutes} between 1 and 1440`),
   check("time_entries_narration_check", sql`length(trim(${table.narration})) between 2 and 500`),
   check("time_entries_billable_scope_check", sql`${table.billable} = false or ${table.legalEntityId} is not null`),

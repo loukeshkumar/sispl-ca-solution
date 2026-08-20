@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import { dayDifference } from "../../lib/dashboard/filters";
 import type { WorkStatus } from "../../lib/dashboard/types";
-import { burnPercentage } from "../../lib/work/capacity";
+import { burnPercentage } from "../../lib/scheduling/capacity";
 import type { CapacityLane, QueueTotals, WorkQueueRow } from "../../lib/work/queue";
 import { workQueueHref, WORK_QUEUE_PRESETS, type WorkQueueParams, type WorkScope, type WorkSort } from "../../lib/work/queue-params";
 import type { WorkMemberOption } from "../../lib/work/repository";

@@ -8,7 +8,6 @@ import { getDashboardDataForConfiguredSource } from "../lib/dashboard/provider";
 import { getDatabase } from "../lib/dashboard/postgres/pool";
 import { getPostgresDashboardDataForTenant } from "../lib/dashboard/postgres/provider";
 import { listDocumentWorkspace, type DocumentWorkspaceData } from "../lib/documents/repository";
-import { listTaskWorkspace, type TaskWorkspaceData } from "../lib/tasks/repository";
 import { listEmployees, type EmployeeSummary } from "../lib/team/repository";
 import { listTodoWorkspace, type TodoWorkspaceData } from "../lib/todos/repository";
 import { getAttendanceWorkspace, type AttendanceWorkspaceData } from "../lib/attendance/repository";
@@ -27,10 +26,12 @@ import { indiaDateKey } from "../lib/registers/repository";
 import { listWorkMembers } from "../lib/work/repository";
 import { getCapacityLanes, getQueueTotals, listWorkQueue, type CapacityLane, type QueueTotals, type WorkQueueRow } from "../lib/work/queue";
 import { DEFAULT_WORK_QUEUE_PARAMS, parseWorkQueueParams } from "../lib/work/queue-params";
+import { canManageAllTasks, getTaskCapacityLanes, getTaskQueueTotals, listTaskQueue, type TaskCapacityLane, type TaskQueueRow, type TaskQueueTotals } from "../lib/tasks/queue";
+import { DEFAULT_TASK_QUEUE_PARAMS, parseTaskQueueParams } from "../lib/tasks/queue-params";
 
 export const dynamic = "force-dynamic";
 
-export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ attendancePeriod?: string; budget?: string; filter?: string; owner?: string; q?: string; registerError?: string; saved?: string; scope?: string; service?: string; sort?: string; timesheetError?: string; view?: string; workspace?: string }> }) {
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ attendancePeriod?: string; budget?: string; estimate?: string; filter?: string; owner?: string; priority?: string; q?: string; registerError?: string; saved?: string; scope?: string; service?: string; sort?: string; timesheetError?: string; view?: string; workspace?: string }> }) {
   const source = resolveDataSource(process.env);
   const query = await searchParams;
   const workspace = query.workspace;
@@ -39,7 +40,6 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   let data;
   let documentWorkspace: DocumentWorkspaceData = { requests: [], documents: [] };
   let clientDocuments: ClientDocumentLibrary = { clients: [], groups: [], totalBytes: 0, totalDocuments: 0 };
-  let taskWorkspace: TaskWorkspaceData = { tasks: [], metrics: { dueToday: 0, overdue: 0, waiting: 0, review: 0 } };
   let employees: EmployeeSummary[] = [];
   let todoWorkspace: TodoWorkspaceData = { todos: [], metrics: { open: 0, overdue: 0, dueToday: 0, upcoming: 0, completed: 0 }, categories: [], todayKey: "" };
   let attendanceWorkspace: AttendanceWorkspaceData = { todayKey: "", periodKey: "", policy: { id: null, effectiveFrom: null, fullDayMinutes: 450, halfDayMinutes: 225, lateGraceMinutes: 15, standardStartTime: "09:30", standardEndTime: "18:00", workingWeekMask: "1111110", timeZone: "Asia/Kolkata", jurisdictionState: "Bihar" }, period: null, selfDays: [], selfRequests: [], approvals: [], team: [], metrics: { present: 0, absent: 0, leave: 0, late: 0, missingPunch: 0, pendingRequests: 0 } };
@@ -61,6 +61,12 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   let workQueueTotals: QueueTotals = { active: 0, overdue: 0, review: 0, waiting: 0 };
   let workQueueLanes: CapacityLane[] = [];
   let workQueueMembers: Awaited<ReturnType<typeof listWorkMembers>> = [];
+  const taskQueueParams = parseTaskQueueParams(query as Record<string, string | undefined>);
+  const wantsTaskQueue = initialWorkspace === "Tasks";
+  let taskQueueRows: TaskQueueRow[] = [];
+  let taskQueueTotals: TaskQueueTotals = { dueToday: 0, overdue: 0, review: 0, waiting: 0 };
+  let taskQueueLanes: TaskCapacityLane[] = [];
+  let taskQueueMembers: Awaited<ReturnType<typeof listWorkMembers>> = [];
 
   if (source === "postgres") {
     const session = await requirePermission("dashboard:read");
@@ -87,10 +93,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     if (initialWorkspace === "User Roles Management" && !canReadRoles) redirect("/forbidden");
     try {
       const todayKey = indiaDateKey();
-      [data, documentWorkspace, taskWorkspace, employees, todoWorkspace, attendanceWorkspace, salaryWorkspace, packageSetupWorkspace, clientPackageWorkspace, serviceManagementWorkspace, roleManagementWorkspace, unreadNotifications, billingWorkspace, registersWorkspace, registerOptions, timesheetWorkspace, timesheetOptions, insightsWorkspace, clientDocuments, workQueueRows, workQueueTotals, workQueueLanes, workQueueMembers] = await Promise.all([
+      [data, documentWorkspace, employees, todoWorkspace, attendanceWorkspace, salaryWorkspace, packageSetupWorkspace, clientPackageWorkspace, serviceManagementWorkspace, roleManagementWorkspace, unreadNotifications, billingWorkspace, registersWorkspace, registerOptions, timesheetWorkspace, timesheetOptions, insightsWorkspace, clientDocuments, workQueueRows, workQueueTotals, workQueueLanes, workQueueMembers, taskQueueRows, taskQueueTotals, taskQueueLanes, taskQueueMembers] = await Promise.all([
         getPostgresDashboardDataForTenant(session.tenantId),
         canReadDocuments ? listDocumentWorkspace(getDatabase(), session.tenantId) : Promise.resolve(documentWorkspace),
-        canReadTasks ? listTaskWorkspace(getDatabase(), session.tenantId, session.userId, session.roleKey) : Promise.resolve(taskWorkspace),
         canReadTeam ? listEmployees(getDatabase(), session.tenantId) : Promise.resolve(employees),
         listTodoWorkspace(getDatabase(), session.tenantId, session.userId),
         initialWorkspace === "Attendance" ? getAttendanceWorkspace(getDatabase(), session.tenantId, session.userId, session.roleKey as Role, attendancePeriod) : Promise.resolve(attendanceWorkspace),
@@ -111,6 +116,10 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         wantsWorkQueue ? getQueueTotals(getDatabase(), session.tenantId, session.userId, workQueueParams, todayKey) : Promise.resolve(workQueueTotals),
         wantsWorkQueue && workQueueParams.view === "capacity" ? getCapacityLanes(getDatabase(), session.tenantId, todayKey) : Promise.resolve(workQueueLanes),
         wantsWorkQueue && hasPermission(session, "work:write") ? listWorkMembers(getDatabase(), session.tenantId) : Promise.resolve(workQueueMembers),
+        wantsTaskQueue && canReadTasks ? listTaskQueue(getDatabase(), session.tenantId, session.userId, session.roleKey, taskQueueParams) : Promise.resolve(taskQueueRows),
+        wantsTaskQueue && canReadTasks ? getTaskQueueTotals(getDatabase(), session.tenantId, session.userId, session.roleKey, taskQueueParams, todayKey) : Promise.resolve(taskQueueTotals),
+        wantsTaskQueue && canReadTasks && taskQueueParams.view === "capacity" ? getTaskCapacityLanes(getDatabase(), session.tenantId, todayKey) : Promise.resolve(taskQueueLanes),
+        wantsTaskQueue && hasPermission(session, "tasks:assign") ? listWorkMembers(getDatabase(), session.tenantId) : Promise.resolve(taskQueueMembers),
       ]);
     } catch (error) {
       console.error("PostgreSQL dashboard load failed.", {
@@ -141,9 +150,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         serviceManagement={serviceManagementWorkspace}
         roleManagement={roleManagementWorkspace}
         roleSaved={query.saved}
-        tasks={taskWorkspace}
         todos={todoWorkspace}
         unreadNotifications={unreadNotifications}
+        taskQueue={{ canAssign: hasPermission(session, "tasks:assign"), canManageAll: canManageAllTasks(session.roleKey), lanes: taskQueueLanes, members: taskQueueMembers, params: taskQueueParams, rows: taskQueueRows, todayKey: indiaDateKey(), totals: taskQueueTotals }}
         workQueue={{ canWrite: hasPermission(session, "work:write"), lanes: workQueueLanes, members: workQueueMembers, params: workQueueParams, rows: workQueueRows, todayKey: indiaDateKey(), totals: workQueueTotals }}
         viewer={{ accessClass: session.accessClass, email: session.email, fullName: session.fullName, permissions: session.permissions, roleKey: session.roleKey, roleName: session.roleName, userId: session.userId }}
       />
@@ -163,5 +172,5 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   registersWorkspace.todayKey = data.todayKey;
   timesheetWorkspace.todayKey = data.todayKey;
   insightsWorkspace.todayKey = data.todayKey;
-  return <DashboardClient workQueue={{ canWrite: false, lanes: [], members: [], params: DEFAULT_WORK_QUEUE_PARAMS, rows: [], todayKey: data.todayKey, totals: { active: 0, overdue: 0, review: 0, waiting: 0 } }} attendance={attendanceWorkspace} billing={billingWorkspace} insights={insightsWorkspace} registerOptions={registerOptions} registers={registersWorkspace} timesheetOptions={timesheetOptions} timesheets={timesheetWorkspace} clientDocuments={clientDocuments} clientPackages={clientPackageWorkspace} data={data} documents={documentWorkspace} employees={employees} initialWorkspace={initialWorkspace} key={initialWorkspace} packageSetup={packageSetupWorkspace} roleManagement={roleManagementWorkspace} roleSaved={query.saved} salary={salaryWorkspace} serviceManagement={serviceManagementWorkspace} tasks={taskWorkspace} todos={todoWorkspace} />;
+  return <DashboardClient taskQueue={{ canAssign: false, canManageAll: false, lanes: [], members: [], params: DEFAULT_TASK_QUEUE_PARAMS, rows: [], todayKey: data.todayKey, totals: { dueToday: 0, overdue: 0, review: 0, waiting: 0 } }} workQueue={{ canWrite: false, lanes: [], members: [], params: DEFAULT_WORK_QUEUE_PARAMS, rows: [], todayKey: data.todayKey, totals: { active: 0, overdue: 0, review: 0, waiting: 0 } }} attendance={attendanceWorkspace} billing={billingWorkspace} insights={insightsWorkspace} registerOptions={registerOptions} registers={registersWorkspace} timesheetOptions={timesheetOptions} timesheets={timesheetWorkspace} clientDocuments={clientDocuments} clientPackages={clientPackageWorkspace} data={data} documents={documentWorkspace} employees={employees} initialWorkspace={initialWorkspace} key={initialWorkspace} packageSetup={packageSetupWorkspace} roleManagement={roleManagementWorkspace} roleSaved={query.saved} salary={salaryWorkspace} serviceManagement={serviceManagementWorkspace} todos={todoWorkspace} />;
 }

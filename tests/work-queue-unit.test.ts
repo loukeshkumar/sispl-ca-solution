@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { planBulkChange, type BulkPlanCandidate } from "../lib/work/bulk";
-import { burnPercentage, capacityHorizonWeeks, remainingBudgetMinutes, weeklyAvailableMinutes, weekStartKey, workingDaysInMask } from "../lib/work/capacity";
+import { burnPercentage, capacityHorizonWeeks, remainingBudgetMinutes, weeklyAvailableMinutes, weekStartKey, workingDaysInMask } from "../lib/scheduling/capacity";
 import { DEFAULT_WORK_QUEUE_PARAMS, parseWorkQueueParams, workQueueHref, WORK_QUEUE_PRESETS } from "../lib/work/queue-params";
 
 test("queue parameters default to the viewer's own list", () => {
