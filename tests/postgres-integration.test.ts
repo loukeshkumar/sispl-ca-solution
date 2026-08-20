@@ -9,6 +9,7 @@ import {
   clientPackageAssignments, clientPackageAssignmentServices, clientPortalCredentials, clientPortalSessions, clientPortalUsers, filingAcknowledgements, invoiceLines, invoices, legalEntities, notificationDeliveries, notifications, officeTasks, payrollEntries, payrollEntryLines, payrollRuns, personalTodos, registrations,
   roleDefinitions, rolePermissions, salaryStructureLines, salaryStructures, tenantMemberships, tenants, userCredentials, userSessions, users, workItems,
   serviceCatalog, servicePackageItems, servicePackages, statutoryRateParameters, statutoryRateVersions,
+  dscCertificates, dscCustodyEvents, statutoryNotices,
 } from "../db/schema";
 import { changeRequiredPassword, clearFailedLogins, consumeLoginRateLimit, findLoginIdentity, createSessionRecord, findSessionByTokenHash, recordFailedLogin, revokeSessionByTokenHash } from "../lib/auth/repository";
 import { createSessionToken, hashSessionToken } from "../lib/auth/tokens";
@@ -38,6 +39,7 @@ import {
   PackageRepositoryError, updatePackage, updateService,
 } from "../lib/packages/repository";
 import { createRoleDefinition, getRoleDefinitionEditorData, RoleRepositoryError, updateRoleDefinition } from "../lib/roles/repository";
+import { applyBulkDscMovement, applyBulkNoticeChange, recordDscCertificate, recordNotice } from "../lib/registers/repository";
 import { generateRecurringWorkItems, listCoverageGaps, listEntitlementWindows, listEvidencedWorkItemIds, raiseCoverageGap } from "../lib/compliance/repository";
 import { BillingRepositoryError, cancelInvoice, createInvoice, getInvoiceDetail, issueInvoice, recordInvoicePayment } from "../lib/billing/repository";
 import { generateDeadlineNotifications } from "../lib/notifications/repository";
@@ -1891,4 +1893,115 @@ test("coverage and entitlement windows never cross a tenant boundary", async () 
   const evidenced = await listEvidencedWorkItemIds(database, identity.tenantId);
   const foreignWork = await database.select({ id: workItems.id }).from(workItems).where(ne(workItems.tenantId, identity.tenantId));
   assert.deepEqual([...evidenced].filter((id) => foreignWork.some((other) => other.id === id)), []);
+});
+
+test("a bulk notice change applies the valid subset and audits each record", async () => {
+  const database = getDatabase();
+  await seedDevelopmentData(database);
+  const identity = await findLoginIdentity(database, "loukesh@example.invalid", "sharma-kumar-ca");
+  assert.ok(identity);
+  const [client] = await database.select({ id: legalEntities.id }).from(legalEntities).where(and(
+    eq(legalEntities.tenantId, identity.tenantId), eq(legalEntities.status, "active"),
+  )).limit(1);
+  assert.ok(client);
+  const suffix = randomUUID().slice(0, 6).toUpperCase();
+  const created: string[] = [];
+
+  try {
+    const open = await recordNotice(database, identity.tenantId, identity.userId, {
+      legalEntityId: client.id, workItemId: null, authority: "income_tax", noticeNumber: `BULK-${suffix}-1`,
+      noticeSection: "143(2)", subject: "Bulk open", noticeDate: "2026-08-01",
+      receivedDate: "2026-08-02", responseDueDate: "2026-08-30", assigneeId: null,
+    });
+    const closed = await recordNotice(database, identity.tenantId, identity.userId, {
+      legalEntityId: client.id, workItemId: null, authority: "gst", noticeNumber: `BULK-${suffix}-2`,
+      noticeSection: "61", subject: "Bulk closed", noticeDate: "2026-08-01",
+      receivedDate: "2026-08-02", responseDueDate: "2026-08-30", assigneeId: null,
+    });
+    created.push(open, closed);
+    await applyBulkNoticeChange(database, identity.tenantId, identity.userId, [closed], { kind: "status", status: "closed" });
+
+    const plan = await applyBulkNoticeChange(database, identity.tenantId, identity.userId, [open, closed], { kind: "status", status: "closed" });
+    assert.equal(plan.apply.length, 1, "the already-closed notice is skipped");
+    assert.equal(plan.apply[0]?.id, open);
+    assert.match(plan.skip[0]!.reason, /already closed/i);
+
+    const rows = await database.select({ id: statutoryNotices.id, respondedOn: statutoryNotices.respondedOn, status: statutoryNotices.status })
+      .from(statutoryNotices).where(inArray(statutoryNotices.id, created));
+    assert.ok(rows.every((row) => row.status === "closed"));
+    // respondedOn carries meaning, so closing must stamp it.
+    assert.ok(rows.every((row) => row.respondedOn !== null), "a closed notice records when it was answered");
+
+    const [{ value: audited }] = await database.select({ value: count() }).from(auditEvents).where(and(
+      eq(auditEvents.tenantId, identity.tenantId), eq(auditEvents.resourceId, open), eq(auditEvents.action, "notice.bulk.status"),
+    ));
+    assert.equal(audited, 1, "one audit event per changed notice");
+  } finally {
+    for (const id of created) {
+      await database.delete(auditEvents).where(eq(auditEvents.resourceId, id));
+      await database.delete(statutoryNotices).where(eq(statutoryNotices.id, id));
+    }
+  }
+});
+
+test("a bulk custody movement writes one trail entry per certificate and refuses ineligible ones", async () => {
+  const database = getDatabase();
+  await seedDevelopmentData(database);
+  const identity = await findLoginIdentity(database, "loukesh@example.invalid", "sharma-kumar-ca");
+  assert.ok(identity);
+  const [client] = await database.select({ id: legalEntities.id }).from(legalEntities).where(and(
+    eq(legalEntities.tenantId, identity.tenantId), eq(legalEntities.status, "active"),
+  )).limit(1);
+  assert.ok(client);
+  const suffix = randomUUID().slice(0, 6).toUpperCase();
+  const created: string[] = [];
+
+  try {
+    const first = await recordDscCertificate(database, identity.tenantId, identity.userId, {
+      legalEntityId: client.id, holderName: "Bulk A", serialNumber: `BULK-${suffix}-A`,
+      issuingAuthority: "eMudhra", certificateClass: "class_3", validFrom: "2025-01-01",
+      validUntil: "2027-01-01", custodianUserId: identity.userId, storageLocation: "A", notes: "",
+    });
+    const second = await recordDscCertificate(database, identity.tenantId, identity.userId, {
+      legalEntityId: client.id, holderName: "Bulk B", serialNumber: `BULK-${suffix}-B`,
+      issuingAuthority: "eMudhra", certificateClass: "class_3", validFrom: "2025-01-01",
+      validUntil: "2027-01-01", custodianUserId: identity.userId, storageLocation: "B", notes: "",
+    });
+    created.push(first, second);
+
+    const out = await applyBulkDscMovement(database, identity.tenantId, identity.userId, [first, second], {
+      counterpartyName: "ROC visit", eventType: "issued_out",
+    });
+    assert.equal(out.apply.length, 2);
+
+    // Signing out again is not a valid transition from issued_out.
+    const again = await applyBulkDscMovement(database, identity.tenantId, identity.userId, [first], {
+      counterpartyName: "ROC visit", eventType: "issued_out",
+    });
+    assert.equal(again.apply.length, 0);
+    assert.match(again.skip[0]!.reason, /already issued out/i);
+
+    // The custody trail is the control: a batch must not collapse it. Counted by
+    // event type, because registering a certificate already writes a 'received'
+    // intake entry that has nothing to do with this movement.
+    const trail = await database.select({ value: count() }).from(dscCustodyEvents).where(and(
+      eq(dscCustodyEvents.tenantId, identity.tenantId),
+      inArray(dscCustodyEvents.dscId, created),
+      eq(dscCustodyEvents.eventType, "issued_out"),
+    ));
+    assert.equal(trail[0]?.value, 2, "one custody event per certificate, not one per batch");
+
+    const back = await applyBulkDscMovement(database, identity.tenantId, identity.userId, [first, second], {
+      counterpartyName: "", custodianUserId: identity.userId, eventType: "returned",
+    });
+    assert.equal(back.apply.length, 2);
+    const statuses = await database.select({ status: dscCertificates.status }).from(dscCertificates).where(inArray(dscCertificates.id, created));
+    assert.ok(statuses.every((row) => row.status === "in_custody"), "returning puts them back in custody");
+  } finally {
+    for (const id of created) {
+      await database.delete(dscCustodyEvents).where(eq(dscCustodyEvents.dscId, id));
+      await database.delete(auditEvents).where(eq(auditEvents.resourceId, id));
+      await database.delete(dscCertificates).where(eq(dscCertificates.id, id));
+    }
+  }
 });

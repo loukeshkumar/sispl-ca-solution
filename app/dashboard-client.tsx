@@ -42,6 +42,7 @@ import type { InsightsWorkspaceData } from "../lib/insights/repository";
 import type { RegisterFormOptions as RegisterOptions } from "./dashboard/register-dialogs";
 import type { TaskQueueViewData } from "./dashboard/tasks-workspace";
 import type { ComplianceViewData } from "./dashboard/compliance-workspace";
+import type { RegisterParams } from "../lib/registers/queue-params";
 import type { TodoQueueViewData } from "./dashboard/todos-workspace";
 import type { WorkQueueViewData } from "./dashboard/work-workspace";
 
@@ -49,7 +50,7 @@ type WorkspaceName = "Overview" | "Clients" | "Client Documents" | "My work" | "
 
 type TimesheetOptions = { clients: Array<{ id: string; name: string }>; work: Array<{ id: string; label: string }>; tasks: Array<{ id: string; title: string }> };
 
-export default function DashboardClient({ compliance, todoQueue, taskQueue, workQueue, attendance, billing, clientDocuments, clientPackages, data, documents, employees, initialWorkspace = "Overview", insights, packageSetup, registerError, registerOptions, registers, roleManagement, roleSaved, salary, serviceManagement, timesheetError, timesheetOptions, timesheets, todos, unreadNotifications = 0, viewer }: { compliance: ComplianceViewData; todoQueue: TodoQueueViewData; taskQueue: TaskQueueViewData; workQueue: WorkQueueViewData; attendance: AttendanceWorkspaceData; billing: BillingWorkspaceData; clientDocuments: ClientDocumentLibrary; insights: InsightsWorkspaceData; registerError?: string; registerOptions: RegisterOptions; registers: RegistersWorkspaceData; timesheetError?: string; timesheetOptions: TimesheetOptions; timesheets: TimesheetWorkspaceData; clientPackages: ClientPackageWorkspaceData; data: DashboardData; documents: DocumentWorkspaceData; employees: EmployeeSummary[]; initialWorkspace?: WorkspaceName; packageSetup: PackageSetupWorkspaceData; roleManagement: RoleManagementWorkspace; roleSaved?: string; salary: SalaryWorkspaceData; serviceManagement: ServiceManagementWorkspaceData; todos: TodoWorkspaceData; unreadNotifications?: number; viewer?: AuthViewer }) {
+export default function DashboardClient({ compliance, todoQueue, taskQueue, workQueue, attendance, billing, clientDocuments, clientPackages, data, documents, employees, initialWorkspace = "Overview", insights, packageSetup, registerError, registerOptions, registerParams, registers, roleManagement, roleSaved, salary, serviceManagement, timesheetError, timesheetOptions, timesheets, todos, unreadNotifications = 0, viewer }: { compliance: ComplianceViewData; todoQueue: TodoQueueViewData; taskQueue: TaskQueueViewData; workQueue: WorkQueueViewData; attendance: AttendanceWorkspaceData; billing: BillingWorkspaceData; clientDocuments: ClientDocumentLibrary; insights: InsightsWorkspaceData; registerError?: string; registerOptions: RegisterOptions; registerParams: RegisterParams; registers: RegistersWorkspaceData; timesheetError?: string; timesheetOptions: TimesheetOptions; timesheets: TimesheetWorkspaceData; clientPackages: ClientPackageWorkspaceData; data: DashboardData; documents: DocumentWorkspaceData; employees: EmployeeSummary[]; initialWorkspace?: WorkspaceName; packageSetup: PackageSetupWorkspaceData; roleManagement: RoleManagementWorkspace; roleSaved?: string; salary: SalaryWorkspaceData; serviceManagement: ServiceManagementWorkspaceData; todos: TodoWorkspaceData; unreadNotifications?: number; viewer?: AuthViewer }) {
   const router = useRouter();
   const [active, setActive] = useState<string>(initialWorkspace);
   const [filter, setFilter] = useState<OverviewFilter>("All");
@@ -139,6 +140,7 @@ export default function DashboardClient({ compliance, todoQueue, taskQueue, work
         <RegistersWorkspace
           canManage={Boolean(viewer && hasPermission(viewer, "registers:manage"))}
           data={registers}
+          params={registerParams}
           options={registerOptions}
           registerError={registerError}
         />

@@ -13244,3 +13244,100 @@ button.kpi-card[aria-pressed="true"] {
   color: var(--muted);
 }
 
+
+/* ---- Registers: action queue, banding, selection ---- */
+
+.register-status-filter {
+  margin: 0 20px 14px;
+}
+
+.register-row-select {
+  align-items: center;
+  display: inline-flex;
+}
+
+.register-row-select input {
+  height: 18px;
+  width: 18px;
+}
+
+.register-attention-list {
+  display: grid;
+  padding: 0 20px 20px;
+}
+
+.register-attention-row {
+  align-items: center;
+  border-left: 3px solid var(--line);
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 14px;
+  grid-template-columns: auto minmax(180px, 2fr) minmax(150px, 1fr) auto;
+  padding: 12px 0 12px 12px;
+}
+
+.register-attention-row.is-overdue { border-left-color: var(--red); }
+.register-attention-row.is-today { border-left-color: var(--amber); }
+.register-attention-row.is-soon { border-left-color: var(--blue); }
+
+.register-attention-row span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.register-attention-row small {
+  color: var(--muted);
+  font-size: var(--type-compact);
+}
+
+.register-attention-kind {
+  align-items: center;
+  border-radius: 10px;
+  display: inline-flex;
+  height: 34px;
+  justify-content: center;
+  width: 34px;
+}
+
+.register-attention-kind svg {
+  height: 17px;
+  width: 17px;
+}
+
+.register-attention-kind.is-notice {
+  background: var(--violet-soft);
+  color: var(--violet);
+}
+
+.register-attention-kind.is-certificate {
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+
+.register-attention-row > a {
+  color: var(--violet);
+  font-size: var(--type-compact);
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.package-catalogue-tabs > a {
+  align-items: center;
+  color: inherit;
+  display: inline-flex;
+  gap: 7px;
+  text-decoration: none;
+}
+
+@media (width <= 860px) {
+  .register-attention-row {
+    grid-template-columns: auto 1fr;
+  }
+
+  .register-attention-row > span:nth-child(3),
+  .register-attention-row > a {
+    grid-column: 2;
+  }
+}
