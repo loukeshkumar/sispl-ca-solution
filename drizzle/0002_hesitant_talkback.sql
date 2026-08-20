@@ -1,0 +1,1 @@
+ALTER TABLE "legal_entities" ADD CONSTRAINT "legal_entities_status_check" CHECK ("legal_entities"."status" in ('active', 'archived'));

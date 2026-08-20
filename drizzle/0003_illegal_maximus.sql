@@ -1,0 +1,2 @@
+ALTER TABLE "work_items" DROP CONSTRAINT "work_items_status_check";--> statement-breakpoint
+ALTER TABLE "work_items" ADD CONSTRAINT "work_items_status_check" CHECK ("work_items"."status" in ('critical', 'at_risk', 'waiting', 'review', 'completed'));

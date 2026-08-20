@@ -1,0 +1,1 @@
+ALTER TABLE "dsc_custody_events" ALTER COLUMN "recorded_by_user_id" DROP NOT NULL;

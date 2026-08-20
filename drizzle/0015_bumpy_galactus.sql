@@ -1,0 +1,2 @@
+ALTER TABLE "service_catalog" DROP CONSTRAINT "service_catalog_code_check";--> statement-breakpoint
+ALTER TABLE "service_catalog" ADD CONSTRAINT "service_catalog_code_check" CHECK ("service_catalog"."code" ~ '^[A-Z0-9][A-Z0-9_-]{1,19}$');
