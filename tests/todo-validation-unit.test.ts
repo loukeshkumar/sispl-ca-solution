@@ -21,6 +21,8 @@ test("personal to-do validation normalizes a complete private item", async () =>
       dueTime: "14:30",
       priority: "high",
       category: "Client follow-up",
+      recurrenceRule: null,
+      recurrenceInterval: null,
     },
   });
 });

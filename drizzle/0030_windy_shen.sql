@@ -1,0 +1,6 @@
+ALTER TABLE "personal_todos" ADD COLUMN "recurrence_rule" text;--> statement-breakpoint
+ALTER TABLE "personal_todos" ADD COLUMN "recurrence_interval" integer;--> statement-breakpoint
+ALTER TABLE "personal_todos" ADD CONSTRAINT "personal_todos_recurrence_rule_check" CHECK ("personal_todos"."recurrence_rule" is null or "personal_todos"."recurrence_rule" in ('day', 'week', 'month'));--> statement-breakpoint
+ALTER TABLE "personal_todos" ADD CONSTRAINT "personal_todos_recurrence_interval_check" CHECK ("personal_todos"."recurrence_interval" is null or "personal_todos"."recurrence_interval" between 1 and 365);--> statement-breakpoint
+ALTER TABLE "personal_todos" ADD CONSTRAINT "personal_todos_recurrence_pair_check" CHECK (("personal_todos"."recurrence_rule" is null) = ("personal_todos"."recurrence_interval" is null));--> statement-breakpoint
+ALTER TABLE "personal_todos" ADD CONSTRAINT "personal_todos_recurrence_due_check" CHECK ("personal_todos"."recurrence_rule" is null or "personal_todos"."due_date" is not null);

@@ -440,6 +440,9 @@ export const personalTodos = pgTable("personal_todos", {
   priority: text("priority").notNull().default("normal"),
   category: text("category").notNull().default(""),
   status: text("status").notNull().default("open"),
+  // Completing an instance schedules the next one. Null means it does not repeat.
+  recurrenceRule: text("recurrence_rule"),
+  recurrenceInterval: integer("recurrence_interval"),
   completedAt: timestamp("completed_at", { withTimezone: true }),
   archivedAt: timestamp("archived_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -456,6 +459,11 @@ export const personalTodos = pgTable("personal_todos", {
   check("personal_todos_status_check", sql`${table.status} in ('open', 'completed', 'archived')`),
   check("personal_todos_completed_state_check", sql`(${table.status} = 'completed' and ${table.completedAt} is not null) or (${table.status} <> 'completed' and ${table.completedAt} is null)`),
   check("personal_todos_archived_state_check", sql`(${table.status} = 'archived' and ${table.archivedAt} is not null) or (${table.status} <> 'archived' and ${table.archivedAt} is null)`),
+  check("personal_todos_recurrence_rule_check", sql`${table.recurrenceRule} is null or ${table.recurrenceRule} in ('day', 'week', 'month')`),
+  check("personal_todos_recurrence_interval_check", sql`${table.recurrenceInterval} is null or ${table.recurrenceInterval} between 1 and 365`),
+  check("personal_todos_recurrence_pair_check", sql`(${table.recurrenceRule} is null) = (${table.recurrenceInterval} is null)`),
+  // A repeat with no due date has no next instance to compute.
+  check("personal_todos_recurrence_due_check", sql`${table.recurrenceRule} is null or ${table.dueDate} is not null`),
 ]);
 
 /**

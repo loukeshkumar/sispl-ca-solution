@@ -26,7 +26,7 @@ import { createEmployee, disableEmployee, getEmployee360, listEmployees, provisi
 import { applyBulkTaskChange, completeOfficeTask, createOfficeTask, getTask360, listTaskWorkspace, TaskRepositoryError, updateOfficeTask, updateOwnTaskStatus } from "../lib/tasks/repository";
 import { getTaskCapacityLanes, listTaskQueue } from "../lib/tasks/queue";
 import { DEFAULT_TASK_QUEUE_PARAMS } from "../lib/tasks/queue-params";
-import { archiveTodo, completeTodo, createTodo, getTodo, listTodoWorkspace, reopenTodo, TodoRepositoryError, updateTodo } from "../lib/todos/repository";
+import { applyBulkTodoChange, archiveTodo, completeTodo, createTodo, getTodo, getTodoLoadStrip, listTodoWorkspace, renameTodoCategory, reopenTodo, TodoRepositoryError, updateTodo } from "../lib/todos/repository";
 import { createAttendancePolicy, getAttendanceWorkspace, lockAttendancePeriod, moveAttendancePeriodToReview, prepareAttendancePeriod, recordManualAttendance, reopenAttendancePeriod, AttendanceRepositoryError } from "../lib/attendance/repository";
 import { eligibleWorkingDateKeys, workingDateKeys } from "../lib/attendance/calculations";
 import {
@@ -761,6 +761,7 @@ test("personal to-dos remain private to their owner through the complete lifecyc
   assert.ok(otherMember);
 
   const todoId = await createTodo(database, identity.tenantId, identity.userId, {
+    recurrenceRule: null, recurrenceInterval: null,
     title: "File the personal follow-up",
     notes: "Keep this reminder private to its owner.",
     dueDate: "2026-08-16",
@@ -777,6 +778,7 @@ test("personal to-dos remain private to their owner through the complete lifecyc
     assert.equal((await listTodoWorkspace(database, identity.tenantId, otherMember.userId, "2026-08-16")).todos.some((todo) => todo.id === todoId), false);
     await assert.rejects(
       () => updateTodo(database, identity.tenantId, otherMember.userId, todoId, {
+        recurrenceRule: null, recurrenceInterval: null,
         title: "Unauthorized edit",
         notes: "",
         dueDate: null,
@@ -788,6 +790,7 @@ test("personal to-dos remain private to their owner through the complete lifecyc
     );
 
     await updateTodo(database, identity.tenantId, identity.userId, todoId, {
+      recurrenceRule: null, recurrenceInterval: null,
       title: "File the personal follow-up today",
       notes: "Owner-updated reminder.",
       dueDate: "2026-08-17",
@@ -1699,5 +1702,108 @@ test("task capacity lanes derive availability from the configured shift", async 
       assert.ok(week.loadMinutes >= 0);
       assert.ok(week.unestimatedCount >= 0);
     }
+  }
+});
+
+test("a bulk to-do change cannot reach another person's private items", async () => {
+  const database = getDatabase();
+  await seedDevelopmentData(database);
+  const identity = await findLoginIdentity(database, "loukesh@example.invalid", "sharma-kumar-ca");
+  assert.ok(identity);
+  const [other] = await database.select({ userId: tenantMemberships.userId }).from(tenantMemberships).where(and(
+    eq(tenantMemberships.tenantId, identity.tenantId), ne(tenantMemberships.userId, identity.userId),
+  )).limit(1);
+  assert.ok(other, "the seed provides another member");
+  const suffix = randomUUID().slice(0, 8);
+  const created: string[] = [];
+
+  try {
+    const mine = await createTodo(database, identity.tenantId, identity.userId, {
+      title: `Mine ${suffix}`, notes: "", dueDate: "2026-09-10", dueTime: null,
+      priority: "normal", category: "Personal", recurrenceRule: null, recurrenceInterval: null,
+    });
+    created.push(mine);
+    const theirs = await createTodo(database, identity.tenantId, other.userId, {
+      title: `Theirs ${suffix}`, notes: "", dueDate: "2026-09-10", dueTime: null,
+      priority: "normal", category: "Personal", recurrenceRule: null, recurrenceInterval: null,
+    });
+    created.push(theirs);
+
+    // Passing someone else's id must change nothing, not merely be filtered later.
+    const plan = await applyBulkTodoChange(database, identity.tenantId, identity.userId, [mine, theirs], { kind: "complete" });
+    assert.equal(plan.apply.length, 1);
+    assert.equal(plan.apply[0]?.id, mine);
+
+    const [untouched] = await database.select({ status: personalTodos.status }).from(personalTodos).where(eq(personalTodos.id, theirs));
+    assert.equal(untouched?.status, "open", "another owner's to-do must be untouched");
+
+    // The same holds for a category rename.
+    const renamed = await renameTodoCategory(database, identity.tenantId, identity.userId, "Personal", `Renamed ${suffix}`);
+    assert.equal(renamed, 1, "only the caller's own rows are renamed");
+    const [theirCategory] = await database.select({ category: personalTodos.category }).from(personalTodos).where(eq(personalTodos.id, theirs));
+    assert.equal(theirCategory?.category, "Personal");
+
+    // And for the load strip.
+    const strip = await getTodoLoadStrip(database, identity.tenantId, identity.userId, "2026-09-10", 1);
+    assert.equal(strip[0]?.count, 0, "a completed to-do leaves the strip, and another owner's never entered it");
+  } finally {
+    for (const id of created) await database.delete(personalTodos).where(eq(personalTodos.id, id));
+  }
+});
+
+test("completing a repeating to-do schedules the next one and leaves the original complete", async () => {
+  const database = getDatabase();
+  await seedDevelopmentData(database);
+  const identity = await findLoginIdentity(database, "loukesh@example.invalid", "sharma-kumar-ca");
+  assert.ok(identity);
+  const suffix = randomUUID().slice(0, 8);
+  const title = `Repeat ${suffix}`;
+
+  try {
+    const first = await createTodo(database, identity.tenantId, identity.userId, {
+      title, notes: "Weekly chase", dueDate: "2026-09-10", dueTime: "09:30",
+      priority: "high", category: "Recurring", recurrenceRule: "week", recurrenceInterval: 1,
+    });
+    const nextId = await completeTodo(database, identity.tenantId, identity.userId, first);
+    assert.ok(nextId, "completing a repeating to-do returns the new instance");
+
+    const rows = await database.select({
+      dueDate: personalTodos.dueDate, dueTime: personalTodos.dueTime, id: personalTodos.id,
+      priority: personalTodos.priority, recurrenceInterval: personalTodos.recurrenceInterval,
+      recurrenceRule: personalTodos.recurrenceRule, status: personalTodos.status,
+    }).from(personalTodos).where(and(eq(personalTodos.tenantId, identity.tenantId), eq(personalTodos.title, title)));
+    assert.equal(rows.length, 2, "the original stays, the next is added");
+    const original = rows.find((row) => row.id === first);
+    const next = rows.find((row) => row.id === nextId);
+    assert.equal(original?.status, "completed");
+    assert.equal(next?.status, "open");
+    assert.equal(next?.dueDate, "2026-09-17", "one week on");
+    assert.equal(next?.dueTime, "09:30", "time of day carries forward");
+    assert.equal(next?.priority, "high");
+    assert.equal(next?.recurrenceRule, "week", "the rule carries forward so the chain continues");
+    assert.equal(next?.recurrenceInterval, 1);
+  } finally {
+    await database.delete(personalTodos).where(and(eq(personalTodos.tenantId, identity.tenantId), eq(personalTodos.title, title)));
+  }
+});
+
+test("completing a non-repeating to-do creates nothing", async () => {
+  const database = getDatabase();
+  await seedDevelopmentData(database);
+  const identity = await findLoginIdentity(database, "loukesh@example.invalid", "sharma-kumar-ca");
+  assert.ok(identity);
+  const title = `Once ${randomUUID().slice(0, 8)}`;
+  try {
+    const id = await createTodo(database, identity.tenantId, identity.userId, {
+      title, notes: "", dueDate: "2026-09-10", dueTime: null,
+      priority: "normal", category: "", recurrenceRule: null, recurrenceInterval: null,
+    });
+    assert.equal(await completeTodo(database, identity.tenantId, identity.userId, id), null);
+    const [{ value }] = await database.select({ value: count() }).from(personalTodos).where(and(
+      eq(personalTodos.tenantId, identity.tenantId), eq(personalTodos.title, title),
+    ));
+    assert.equal(value, 1, "no phantom follow-up");
+  } finally {
+    await database.delete(personalTodos).where(and(eq(personalTodos.tenantId, identity.tenantId), eq(personalTodos.title, title)));
   }
 });
