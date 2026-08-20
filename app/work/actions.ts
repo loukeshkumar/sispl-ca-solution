@@ -38,6 +38,7 @@ function writeError(error: unknown): WorkActionState {
 export type WorkFormOptions = {
   clients: Awaited<ReturnType<typeof listWorkClients>>;
   defaults: { internalDueDate: string; statutoryDueDate: string };
+  todayKey: string;
   members: Awaited<ReturnType<typeof listWorkMembers>>;
 };
 
@@ -57,7 +58,7 @@ export async function loadWorkFormOptions(): Promise<WorkFormOptions> {
     listWorkClients(database, session.tenantId),
     listWorkMembers(database, session.tenantId),
   ]);
-  return { clients, defaults: { internalDueDate: dateOffset(5), statutoryDueDate: dateOffset(7) }, members };
+  return { clients, defaults: { internalDueDate: dateOffset(5), statutoryDueDate: dateOffset(7) }, members, todayKey: dateOffset(0) };
 }
 
 /**
