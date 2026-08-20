@@ -1249,18 +1249,24 @@ button.kpi-card[aria-pressed="true"] {
   padding: 0 20px 14px;
 }
 
-.segment-control button {
+.segment-control button,
+.segment-control > a {
+  align-items: center;
   background: #fff;
   border: 1px solid var(--line);
   border-radius: 999px;
   color: #4d5d72;
+  display: inline-flex;
   font-size: var(--type-supporting);
   height: 44px;
   padding: 0 13px;
+  text-decoration: none;
 }
 
 .segment-control button:hover,
-.segment-control button[aria-pressed="true"] {
+.segment-control button[aria-pressed="true"],
+.segment-control > a:hover,
+.segment-control > a[aria-current="page"] {
   background: var(--violet);
   border-color: var(--violet);
   color: #fff;
@@ -12570,4 +12576,224 @@ button.kpi-card[aria-pressed="true"] {
   color: var(--muted);
   font-size: var(--type-compact);
   padding: 14px 11px;
+}
+
+
+/* ---- My Work queue: scope tabs, presets, burn, capacity ---- */
+
+.work-scope-tabs {
+  margin-bottom: 18px;
+}
+
+.work-presets {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 18px;
+}
+
+.work-presets > span {
+  color: var(--muted);
+  font-size: var(--type-compact);
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.work-presets > a {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: #4d5d72;
+  font-size: var(--type-compact);
+  padding: 6px 12px;
+  text-decoration: none;
+}
+
+.work-presets > a:hover {
+  border-color: var(--violet);
+  color: var(--violet);
+}
+
+.work-workspace-row {
+  grid-template-columns: auto minmax(200px, 1.5fr) minmax(120px, .8fr) minmax(96px, .6fr) minmax(110px, .7fr) minmax(110px, .6fr) auto 24px;
+}
+
+.work-workspace-row:not(:has(.work-row-select)) {
+  grid-template-columns: minmax(200px, 1.5fr) minmax(120px, .8fr) minmax(96px, .6fr) minmax(110px, .7fr) minmax(110px, .6fr) auto 24px;
+}
+
+.work-row-select {
+  align-items: center;
+  display: inline-flex;
+}
+
+.work-row-select input {
+  height: 18px;
+  width: 18px;
+}
+
+.work-row-main {
+  align-items: center;
+  color: inherit;
+  display: flex;
+  gap: 12px;
+  text-decoration: none;
+}
+
+.work-workspace-burn {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.work-burn {
+  color: #4d5d72;
+  font-variant-numeric: tabular-nums;
+}
+
+.work-burn.is-over {
+  color: var(--red);
+  font-weight: 600;
+}
+
+.work-burn-percent,
+.work-burn-none,
+.work-statutory-note {
+  color: var(--muted);
+  font-size: var(--type-compact);
+}
+
+.work-missing-chip {
+  background: #fff4e5;
+  border-radius: 999px;
+  color: #8a5300;
+  font-size: var(--type-compact);
+  padding: 2px 8px;
+  width: fit-content;
+}
+
+.work-bulk-bar {
+  align-items: end;
+  background: #f8f9fc;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 0 20px 14px;
+  padding: 14px 16px;
+}
+
+.work-bulk-bar label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.work-bulk-bar label > span {
+  color: var(--muted);
+  font-size: var(--type-compact);
+}
+
+.work-bulk-bar select,
+.work-bulk-bar input {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  height: 40px;
+  min-width: 150px;
+  padding: 0 10px;
+}
+
+.work-bulk-result {
+  align-self: center;
+  color: var(--muted);
+  font-size: var(--type-compact);
+  margin: 0;
+  min-height: 1em;
+}
+
+.work-bulk-result.is-error {
+  color: var(--red);
+}
+
+.work-capacity-scroll {
+  overflow-x: auto;
+  padding: 0 20px 20px;
+}
+
+.work-capacity {
+  min-width: 640px;
+}
+
+.work-capacity-head,
+.work-capacity-lane {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(9rem, 1fr) repeat(4, minmax(6rem, 1fr));
+}
+
+.work-capacity-head {
+  color: var(--muted);
+  font-size: var(--type-compact);
+  padding-bottom: 8px;
+}
+
+.work-capacity-lane {
+  align-items: center;
+  border-top: 1px solid var(--line);
+  padding: 10px 0;
+}
+
+.work-capacity-name {
+  font-weight: 600;
+}
+
+.work-capacity-cell {
+  /* Overridden inline per cell. Defined here so a missing inline style renders
+     an empty bar rather than an unresolved gradient. */
+  --fill: 0%;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px;
+  position: relative;
+  text-decoration: none;
+}
+
+.work-capacity-cell strong {
+  font-variant-numeric: tabular-nums;
+}
+
+.work-capacity-cell em {
+  color: var(--muted);
+  font-size: var(--type-compact);
+  font-style: normal;
+}
+
+.work-capacity-bar {
+  background: linear-gradient(to right, var(--violet) var(--fill), #eceaf6 var(--fill));
+  border-radius: 999px;
+  display: block;
+  height: 6px;
+}
+
+.work-capacity-cell.is-tight .work-capacity-bar {
+  background: linear-gradient(to right, #d98a00 var(--fill), #f5ecd8 var(--fill));
+}
+
+.work-capacity-cell.is-over {
+  border-color: var(--red);
+}
+
+.work-capacity-cell.is-over .work-capacity-bar {
+  background: var(--red);
+}
+
+.work-capacity-cell.is-over strong {
+  color: var(--red);
 }
