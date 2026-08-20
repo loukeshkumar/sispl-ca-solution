@@ -3153,7 +3153,7 @@ button.kpi-card[aria-pressed="true"] {
   color: inherit;
   display: grid;
   gap: 14px;
-  grid-template-columns: minmax(180px, 1.3fr) minmax(105px, .6fr) minmax(150px, .9fr) auto 24px;
+  grid-template-columns: minmax(170px, 1.25fr) minmax(100px, .55fr) minmax(130px, .8fr) minmax(88px, .5fr) auto 24px;
   min-height: 78px;
   padding: 14px 20px;
   text-decoration: none;
@@ -3193,17 +3193,25 @@ button.kpi-card[aria-pressed="true"] {
   margin: 5px 0 18px;
 }
 
-.compliance-health-card > div {
+.compliance-health-card > div,
+.compliance-health-card > a {
   align-items: center;
+  color: inherit;
   display: grid;
   font-size: 12px;
   gap: 8px;
   grid-template-columns: 48px 1fr 34px;
   margin-top: 11px;
+  text-decoration: none;
 }
 
-.compliance-health-card > div strong {
+.compliance-health-card > div strong,
+.compliance-health-card > a strong {
   font-size: 12px;
+}
+
+.compliance-health-card > a:hover {
+  color: var(--violet);
 }
 
 .compliance-deadline-card > div {
@@ -13236,16 +13244,3 @@ button.kpi-card[aria-pressed="true"] {
   color: var(--muted);
 }
 
-.compliance-health-card > a {
-  align-items: center;
-  color: inherit;
-  display: grid;
-  gap: 10px;
-  grid-template-columns: minmax(80px, 1fr) minmax(90px, 2fr) auto;
-  padding: 8px 0;
-  text-decoration: none;
-}
-
-.compliance-health-card > a:hover {
-  color: var(--violet);
-}

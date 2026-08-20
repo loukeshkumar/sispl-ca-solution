@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import { buildRecurringWorkDrafts } from "../lib/compliance/recurrence";
@@ -123,4 +124,27 @@ test("the matrix bounds its columns so a long history cannot widen the grid fore
   }));
   assert.equal(buildComplianceMatrix(rows, 6).periods.length, 6);
   assert.equal(buildComplianceMatrix(rows, 6).periods.at(-1), "2026-12", "the most recent periods are kept");
+});
+
+test("the compliance register declares a column for every cell it renders", async () => {
+  const [workspace, css] = await Promise.all([
+    readFile(new URL("../app/dashboard/compliance-workspace.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+  // The row gained an evidence cell while the grid still declared five columns,
+  // which pushed the arrow onto its own row and collided evidence with status.
+  const rule = css.slice(css.indexOf(".compliance-register-list > a {"));
+  const columns = rule.slice(rule.indexOf("grid-template-columns:"), rule.indexOf("}"));
+  const declared = (columns.match(/minmax\([^)]*\)|\bauto\b|\d+px/g) ?? []).length;
+  assert.ok(declared >= 6, `the register renders six cells but declares ${declared} columns`);
+  assert.ok(workspace.includes("compliance-evidence"), "the evidence cell is the sixth");
+});
+
+test("service readiness rows keep their grid after becoming links", async () => {
+  const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+  const rule = css.slice(css.indexOf(".compliance-health-card > div"), css.indexOf(".compliance-deadline-card > div"));
+  // Drilling through turned these rows from divs into anchors; a rule targeting
+  // only divs left them as inline links with the bar stacked underneath.
+  assert.match(rule, /\.compliance-health-card > a/, "the grid must cover links too");
+  assert.match(rule, /grid-template-columns: 48px 1fr 34px/);
 });
