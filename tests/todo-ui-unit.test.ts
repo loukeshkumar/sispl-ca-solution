@@ -43,7 +43,13 @@ test("the dashboard exposes a complete responsive personal to-do workspace", asy
     read("app/globals.css"),
   ]);
 
-  for (const label of ["TODAY", "OVERDUE", "UPCOMING", "COMPLETED", "Archived", "Priority", "Category"]) {
+  // View names live with the parser that validates them; the workspace renders
+  // whatever that list offers.
+  const viewParams = await readFile(new URL("../lib/todos/queue-params.ts", import.meta.url), "utf8");
+  for (const view of ["Today", "Upcoming", "Overdue", "Completed", "Archived", "All open"]) {
+    assert.ok(viewParams.includes(view), `${view} must be an offered view`);
+  }
+  for (const label of ["TODAY", "OVERDUE", "UPCOMING", "COMPLETED", "Priority", "Category"]) {
     assert.match(workspace, new RegExp(label));
   }
   assert.match(workspace, /createTodoAction/);
