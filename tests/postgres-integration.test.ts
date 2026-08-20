@@ -15,7 +15,7 @@ import { changeRequiredPassword, clearFailedLogins, consumeLoginRateLimit, findL
 import { createSessionToken, hashSessionToken } from "../lib/auth/tokens";
 import { archiveClient, ClientRepositoryError, createClient, getClient360Data, updateClient } from "../lib/clients/repository";
 import { SEEDED_TENANT_ID } from "../lib/dashboard/fixtures";
-import { cancelDocumentRequest, createDocumentRequest, getDocumentMetadata, listDocumentWorkspace, recordDocumentUpload } from "../lib/documents/repository";
+import { applyBulkRequestCancel, cancelDocumentRequest, createDocumentRequest, getDocumentMetadata, listDocumentWorkspace, recordDocumentUpload } from "../lib/documents/repository";
 import { mapDashboardRecords } from "../lib/dashboard/mapper";
 import { closePostgresPool, getDatabase, getPostgresPool } from "../lib/dashboard/postgres/pool";
 import { loadDashboardRecords } from "../lib/dashboard/postgres/repository";
@@ -2002,6 +2002,61 @@ test("a bulk custody movement writes one trail entry per certificate and refuses
       await database.delete(dscCustodyEvents).where(eq(dscCustodyEvents.dscId, id));
       await database.delete(auditEvents).where(eq(auditEvents.resourceId, id));
       await database.delete(dscCertificates).where(eq(dscCertificates.id, id));
+    }
+  }
+});
+
+test("a bulk request cancel applies the valid subset, is tenant scoped, and audits each record", async () => {
+  const database = getDatabase();
+  await seedDevelopmentData(database);
+  const identity = await findLoginIdentity(database, "loukesh@example.invalid", "sharma-kumar-ca");
+  assert.ok(identity);
+  const [client] = await database.select({ id: legalEntities.id }).from(legalEntities).where(and(
+    eq(legalEntities.tenantId, identity.tenantId), eq(legalEntities.status, "active"),
+  )).limit(1);
+  assert.ok(client);
+  const suffix = randomUUID().slice(0, 6).toUpperCase();
+  const created: string[] = [];
+
+  try {
+    const open = await createDocumentRequest(database, identity.tenantId, identity.userId, {
+      legalEntityId: client.id, workItemId: null, title: `BULKDOC-${suffix}-1`, description: "", dueDate: "2026-09-10",
+    });
+    const settled = await createDocumentRequest(database, identity.tenantId, identity.userId, {
+      legalEntityId: client.id, workItemId: null, title: `BULKDOC-${suffix}-2`, description: "", dueDate: "2026-09-10",
+    });
+    created.push(open, settled);
+    await cancelDocumentRequest(database, identity.tenantId, identity.userId, settled);
+
+    const plan = await applyBulkRequestCancel(database, identity.tenantId, identity.userId, [open, settled]);
+    assert.equal(plan.apply.length, 1, "an already-cancelled request is skipped");
+    assert.equal(plan.apply[0]?.id, open);
+    assert.match(plan.skip[0]!.reason, /already cancelled/i);
+
+    const rows = await database.select({ id: documentRequests.id, status: documentRequests.status })
+      .from(documentRequests).where(inArray(documentRequests.id, created));
+    assert.ok(rows.every((row) => row.status === "cancelled"));
+
+    const [{ value: audited }] = await database.select({ value: count() }).from(auditEvents).where(and(
+      eq(auditEvents.tenantId, identity.tenantId),
+      eq(auditEvents.resourceId, open),
+      eq(auditEvents.action, "document_request.cancelled"),
+    ));
+    assert.equal(audited, 1, "one audit event per cancelled request");
+
+    // Another tenant's request id must change nothing, not merely be filtered out.
+    const foreign = await database.select({ id: documentRequests.id, status: documentRequests.status })
+      .from(documentRequests).where(ne(documentRequests.tenantId, identity.tenantId)).limit(1);
+    if (foreign[0]) {
+      const crossed = await applyBulkRequestCancel(database, identity.tenantId, identity.userId, [foreign[0].id]);
+      assert.deepEqual(crossed, { apply: [], skip: [] }, "an id outside the tenant is never loaded");
+      const [after] = await database.select({ status: documentRequests.status }).from(documentRequests).where(eq(documentRequests.id, foreign[0].id));
+      assert.equal(after?.status, foreign[0].status, "and is left untouched");
+    }
+  } finally {
+    for (const id of created) {
+      await database.delete(auditEvents).where(eq(auditEvents.resourceId, id));
+      await database.delete(documentRequests).where(eq(documentRequests.id, id));
     }
   }
 });
