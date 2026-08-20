@@ -31,10 +31,12 @@ import { DEFAULT_TASK_QUEUE_PARAMS, parseTaskQueueParams } from "../lib/tasks/qu
 import { DEFAULT_TODO_QUEUE_PARAMS, parseTodoQueueParams } from "../lib/todos/queue-params";
 import { filterTodoQueue, getTodoLoadStrip } from "../lib/todos/repository";
 import type { LoadStripDay } from "../lib/todos/recurrence";
+import { listCoverageGaps, listEvidencedWorkItemIds, type CoverageGap } from "../lib/compliance/repository";
+import { DEFAULT_COMPLIANCE_PARAMS, parseComplianceParams } from "../lib/compliance/queue-params";
 
 export const dynamic = "force-dynamic";
 
-export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ attendancePeriod?: string; budget?: string; category?: string; estimate?: string; filter?: string; layout?: string; owner?: string; priority?: string; q?: string; registerError?: string; saved?: string; scope?: string; service?: string; sort?: string; timesheetError?: string; view?: string; workspace?: string }> }) {
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ attendancePeriod?: string; budget?: string; category?: string; estimate?: string; evidence?: string; filter?: string; layout?: string; owner?: string; priority?: string; q?: string; registerError?: string; saved?: string; scope?: string; service?: string; sort?: string; timesheetError?: string; view?: string; workspace?: string }> }) {
   const source = resolveDataSource(process.env);
   const query = await searchParams;
   const workspace = query.workspace;
@@ -72,6 +74,11 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   let taskQueueMembers: Awaited<ReturnType<typeof listWorkMembers>> = [];
   const todoQueueParams = parseTodoQueueParams(query as Record<string, string | undefined>);
   let todoLoadStrip: LoadStripDay[] = [];
+  const complianceParams = parseComplianceParams(query as Record<string, string | undefined>);
+  const wantsCompliance = initialWorkspace === "Compliance";
+  let complianceRows: WorkQueueRow[] = [];
+  let complianceGaps: CoverageGap[] = [];
+  let complianceEvidenced: string[] = [];
 
   if (source === "postgres") {
     const session = await requirePermission("dashboard:read");
@@ -98,7 +105,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     if (initialWorkspace === "User Roles Management" && !canReadRoles) redirect("/forbidden");
     try {
       const todayKey = indiaDateKey();
-      [data, documentWorkspace, employees, todoWorkspace, attendanceWorkspace, salaryWorkspace, packageSetupWorkspace, clientPackageWorkspace, serviceManagementWorkspace, roleManagementWorkspace, unreadNotifications, billingWorkspace, registersWorkspace, registerOptions, timesheetWorkspace, timesheetOptions, insightsWorkspace, clientDocuments, workQueueRows, workQueueTotals, workQueueLanes, workQueueMembers, taskQueueRows, taskQueueTotals, taskQueueLanes, taskQueueMembers, todoLoadStrip] = await Promise.all([
+      [data, documentWorkspace, employees, todoWorkspace, attendanceWorkspace, salaryWorkspace, packageSetupWorkspace, clientPackageWorkspace, serviceManagementWorkspace, roleManagementWorkspace, unreadNotifications, billingWorkspace, registersWorkspace, registerOptions, timesheetWorkspace, timesheetOptions, insightsWorkspace, clientDocuments, workQueueRows, workQueueTotals, workQueueLanes, workQueueMembers, taskQueueRows, taskQueueTotals, taskQueueLanes, taskQueueMembers, todoLoadStrip, complianceRows, complianceGaps, complianceEvidenced] = await Promise.all([
         getPostgresDashboardDataForTenant(session.tenantId),
         canReadDocuments ? listDocumentWorkspace(getDatabase(), session.tenantId) : Promise.resolve(documentWorkspace),
         canReadTeam ? listEmployees(getDatabase(), session.tenantId) : Promise.resolve(employees),
@@ -126,6 +133,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         wantsTaskQueue && canReadTasks && taskQueueParams.view === "capacity" ? getTaskCapacityLanes(getDatabase(), session.tenantId, todayKey) : Promise.resolve(taskQueueLanes),
         wantsTaskQueue && hasPermission(session, "tasks:assign") ? listWorkMembers(getDatabase(), session.tenantId) : Promise.resolve(taskQueueMembers),
         initialWorkspace === "To-do" ? getTodoLoadStrip(getDatabase(), session.tenantId, session.userId, todayKey) : Promise.resolve(todoLoadStrip),
+        wantsCompliance ? listWorkQueue(getDatabase(), session.tenantId, session.userId, { ...DEFAULT_WORK_QUEUE_PARAMS, filter: complianceParams.status, scope: "firm", service: complianceParams.service }, todayKey) : Promise.resolve(complianceRows),
+        wantsCompliance ? listCoverageGaps(getDatabase(), session.tenantId, todayKey) : Promise.resolve(complianceGaps),
+        wantsCompliance ? listEvidencedWorkItemIds(getDatabase(), session.tenantId).then((ids) => [...ids]) : Promise.resolve(complianceEvidenced),
       ]);
     } catch (error) {
       console.error("PostgreSQL dashboard load failed.", {
@@ -158,6 +168,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         roleSaved={query.saved}
         todos={todoWorkspace}
         unreadNotifications={unreadNotifications}
+        compliance={{ canWrite: hasPermission(session, "work:write"), data, evidenced: complianceEvidenced, gaps: complianceGaps, params: complianceParams, rows: complianceRows, services: [...new Set(complianceRows.map((row) => row.serviceKey.toUpperCase()))].sort(), todayKey: indiaDateKey() }}
         todoQueue={{ loadStrip: todoLoadStrip, params: todoQueueParams, todos: filterTodoQueue(todoWorkspace.todos, todoQueueParams, todoWorkspace.todayKey), workspace: todoWorkspace }}
         taskQueue={{ canAssign: hasPermission(session, "tasks:assign"), canManageAll: canManageAllTasks(session.roleKey), lanes: taskQueueLanes, members: taskQueueMembers, params: taskQueueParams, rows: taskQueueRows, todayKey: indiaDateKey(), totals: taskQueueTotals }}
         workQueue={{ canWrite: hasPermission(session, "work:write"), lanes: workQueueLanes, members: workQueueMembers, params: workQueueParams, rows: workQueueRows, todayKey: indiaDateKey(), totals: workQueueTotals }}
@@ -179,5 +190,5 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   registersWorkspace.todayKey = data.todayKey;
   timesheetWorkspace.todayKey = data.todayKey;
   insightsWorkspace.todayKey = data.todayKey;
-  return <DashboardClient todoQueue={{ loadStrip: [], params: DEFAULT_TODO_QUEUE_PARAMS, todos: filterTodoQueue(todoWorkspace.todos, DEFAULT_TODO_QUEUE_PARAMS, todoWorkspace.todayKey), workspace: todoWorkspace }} taskQueue={{ canAssign: false, canManageAll: false, lanes: [], members: [], params: DEFAULT_TASK_QUEUE_PARAMS, rows: [], todayKey: data.todayKey, totals: { dueToday: 0, overdue: 0, review: 0, waiting: 0 } }} workQueue={{ canWrite: false, lanes: [], members: [], params: DEFAULT_WORK_QUEUE_PARAMS, rows: [], todayKey: data.todayKey, totals: { active: 0, overdue: 0, review: 0, waiting: 0 } }} attendance={attendanceWorkspace} billing={billingWorkspace} insights={insightsWorkspace} registerOptions={registerOptions} registers={registersWorkspace} timesheetOptions={timesheetOptions} timesheets={timesheetWorkspace} clientDocuments={clientDocuments} clientPackages={clientPackageWorkspace} data={data} documents={documentWorkspace} employees={employees} initialWorkspace={initialWorkspace} key={initialWorkspace} packageSetup={packageSetupWorkspace} roleManagement={roleManagementWorkspace} roleSaved={query.saved} salary={salaryWorkspace} serviceManagement={serviceManagementWorkspace} todos={todoWorkspace} />;
+  return <DashboardClient compliance={{ canWrite: false, data, evidenced: [], gaps: [], params: DEFAULT_COMPLIANCE_PARAMS, rows: [], services: [], todayKey: data.todayKey }} todoQueue={{ loadStrip: [], params: DEFAULT_TODO_QUEUE_PARAMS, todos: filterTodoQueue(todoWorkspace.todos, DEFAULT_TODO_QUEUE_PARAMS, todoWorkspace.todayKey), workspace: todoWorkspace }} taskQueue={{ canAssign: false, canManageAll: false, lanes: [], members: [], params: DEFAULT_TASK_QUEUE_PARAMS, rows: [], todayKey: data.todayKey, totals: { dueToday: 0, overdue: 0, review: 0, waiting: 0 } }} workQueue={{ canWrite: false, lanes: [], members: [], params: DEFAULT_WORK_QUEUE_PARAMS, rows: [], todayKey: data.todayKey, totals: { active: 0, overdue: 0, review: 0, waiting: 0 } }} attendance={attendanceWorkspace} billing={billingWorkspace} insights={insightsWorkspace} registerOptions={registerOptions} registers={registersWorkspace} timesheetOptions={timesheetOptions} timesheets={timesheetWorkspace} clientDocuments={clientDocuments} clientPackages={clientPackageWorkspace} data={data} documents={documentWorkspace} employees={employees} initialWorkspace={initialWorkspace} key={initialWorkspace} packageSetup={packageSetupWorkspace} roleManagement={roleManagementWorkspace} roleSaved={query.saved} salary={salaryWorkspace} serviceManagement={serviceManagementWorkspace} todos={todoWorkspace} />;
 }

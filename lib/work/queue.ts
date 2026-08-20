@@ -27,6 +27,7 @@ export type WorkQueueRow = {
   clientInitials: string;
   id: string;
   internalDueDate: string | null;
+  legalEntityId: string;
   loggedMinutes: number;
   missingItemCount: number;
   owner: string;
@@ -118,6 +119,7 @@ export async function listWorkQueue(
     client: legalEntities.displayName,
     id: workItems.id,
     internalDueDate: workItems.internalDueDate,
+    legalEntityId: workItems.legalEntityId,
     loggedMinutes,
     missingItemCount: workItems.missingItemCount,
     owner: users.fullName,
