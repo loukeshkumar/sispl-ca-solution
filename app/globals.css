@@ -12797,3 +12797,255 @@ button.kpi-card[aria-pressed="true"] {
 .work-capacity-cell.is-over strong {
   color: var(--red);
 }
+
+
+/* ---- Create / edit work item dialog ----------------------------------
+   Everything here is scoped to .work-editor-form or the opt-in
+   .is-accent-work-editor-accent class, so the six other form dialogs that
+   share .client-form-section are untouched. */
+
+.form-dialog.is-accent-work-editor-accent .form-dialog-header {
+  background: linear-gradient(120deg, var(--violet) 0%, #6f5ce7 45%, #8b5cf6 100%);
+  border-bottom: none;
+  color: #fff;
+}
+
+.form-dialog.is-accent-work-editor-accent .form-dialog-header h2 {
+  color: #fff;
+}
+
+.form-dialog.is-accent-work-editor-accent .form-dialog-header p {
+  color: rgb(255 255 255 / 82%);
+}
+
+.form-dialog.is-accent-work-editor-accent .form-dialog-close {
+  background: rgb(255 255 255 / 14%);
+  border-color: rgb(255 255 255 / 30%);
+  color: #fff;
+}
+
+.form-dialog.is-accent-work-editor-accent .form-dialog-close:hover {
+  background: rgb(255 255 255 / 26%);
+}
+
+/* Each phase of the form carries its own accent, so the three sections read
+   as distinct steps rather than one long wall of fields. */
+.work-form-section {
+  border-left: 4px solid var(--section-accent, var(--violet));
+  box-shadow: 0 1px 2px rgb(30 27 75 / 4%), 0 8px 24px rgb(30 27 75 / 5%);
+  position: relative;
+  transition: box-shadow .18s ease;
+}
+
+.work-form-section:focus-within {
+  box-shadow: 0 1px 2px rgb(30 27 75 / 6%), 0 12px 30px rgb(30 27 75 / 9%);
+}
+
+.work-form-section.is-obligation {
+  --section-accent: var(--violet);
+  --section-wash: var(--violet-soft);
+}
+
+.work-form-section.is-deadlines {
+  --section-accent: var(--amber);
+  --section-wash: var(--amber-soft);
+}
+
+.work-form-section.is-workflow {
+  --section-accent: var(--mint);
+  --section-wash: var(--mint-soft);
+}
+
+.work-form-section > div:first-child {
+  border-radius: 14px;
+  padding: 4px 0 4px 14px;
+  position: relative;
+}
+
+.work-form-section > div:first-child::before {
+  background: var(--section-wash);
+  border-radius: 999px;
+  content: "";
+  inset: 0 auto 0 0;
+  position: absolute;
+  width: 4px;
+}
+
+.work-form-section .eyebrow {
+  color: var(--section-accent);
+}
+
+.work-editor-form input:focus,
+.work-editor-form select:focus,
+.work-editor-form textarea:focus {
+  border-color: var(--section-accent, var(--violet));
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--section-accent, var(--violet)) 16%, transparent);
+  outline: none;
+}
+
+.work-form-hint {
+  color: var(--muted);
+  font-size: var(--type-compact);
+}
+
+/* Quick-fill for a free-text field whose expected shape is not obvious. */
+.work-period-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.work-period-presets button {
+  background: var(--violet-soft);
+  border: 1px solid transparent;
+  border-radius: 999px;
+  color: var(--violet);
+  cursor: pointer;
+  font-size: var(--type-compact);
+  font-weight: 600;
+  padding: 4px 10px;
+}
+
+.work-period-presets button:hover {
+  background: var(--violet);
+  color: #fff;
+}
+
+/* The ordering rule, answered while typing instead of after a round trip. */
+.work-buffer-pill {
+  align-items: center;
+  border-radius: 12px;
+  display: flex;
+  font-size: var(--type-compact);
+  font-weight: 600;
+  gap: 8px;
+  margin: 0;
+  min-height: 20px;
+  padding: 0;
+}
+
+.work-buffer-pill.is-none {
+  visibility: hidden;
+}
+
+.work-buffer-pill::before {
+  border-radius: 999px;
+  content: "";
+  height: 8px;
+  width: 8px;
+}
+
+.work-buffer-pill.is-ok { color: var(--mint); }
+.work-buffer-pill.is-ok::before { background: var(--mint); }
+.work-buffer-pill.is-tight { color: var(--amber); }
+.work-buffer-pill.is-tight::before { background: var(--amber); }
+.work-buffer-pill.is-invalid { color: var(--red); }
+.work-buffer-pill.is-invalid::before { background: var(--red); }
+
+.work-buffer-pill.is-ok,
+.work-buffer-pill.is-tight,
+.work-buffer-pill.is-invalid {
+  padding: 8px 12px;
+}
+
+.work-buffer-pill.is-ok { background: var(--mint-soft); }
+.work-buffer-pill.is-tight { background: var(--amber-soft); }
+.work-buffer-pill.is-invalid { background: var(--red-soft); }
+
+/* Tinted to the badge this status will produce. */
+.work-status-select {
+  border-left-width: 4px;
+  font-weight: 600;
+}
+
+.work-status-select.is-red { border-left-color: var(--red); color: var(--red); }
+.work-status-select.is-amber { border-left-color: var(--amber); color: var(--amber); }
+.work-status-select.is-blue { border-left-color: var(--blue); color: var(--blue); }
+.work-status-select.is-mint { border-left-color: var(--mint); color: var(--mint); }
+
+.work-progress-meter {
+  background: var(--violet-soft);
+  border-radius: 999px;
+  display: block;
+  height: 6px;
+  overflow: hidden;
+}
+
+.work-progress-meter i {
+  background: linear-gradient(90deg, var(--violet), #8b5cf6);
+  display: block;
+  height: 100%;
+  transition: width .2s ease;
+}
+
+.work-member-chip {
+  align-items: center;
+  color: var(--muted);
+  display: inline-flex;
+  font-size: var(--type-compact);
+  font-weight: 500;
+  gap: 6px;
+  margin-left: 8px;
+}
+
+.work-member-chip > span {
+  background: var(--violet-soft);
+  border-radius: 999px;
+  color: var(--violet);
+  display: inline-flex;
+  font-size: var(--type-compact);
+  font-weight: 700;
+  height: 22px;
+  justify-content: center;
+  align-items: center;
+  width: 22px;
+}
+
+.work-form-summary {
+  align-items: center;
+  background: var(--input-surface);
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  color: var(--ink);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: var(--type-compact);
+  gap: 10px;
+  margin: 0;
+  padding: 10px 14px;
+}
+
+.work-form-summary span {
+  color: var(--muted);
+}
+
+.work-form-summary em {
+  border-left: 1px solid var(--line);
+  color: var(--muted);
+  font-style: normal;
+  padding-left: 10px;
+}
+
+.work-form-summary em.is-invalid { color: var(--red); font-weight: 600; }
+.work-form-summary em.is-tight { color: var(--amber); }
+.work-form-summary em.is-ok { color: var(--mint); }
+
+.work-form-submit {
+  background: linear-gradient(120deg, var(--violet), #7c3aed);
+  border: none;
+}
+
+.work-form-submit:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .work-form-section,
+  .work-progress-meter i { transition: none; }
+}
+
+@media (width <= 860px) {
+  .work-form-section {
+    border-left-width: 3px;
+  }
+}
