@@ -28,7 +28,6 @@ import { hasPermission, type AuthViewer } from "../lib/auth/authorization";
 import type { DashboardData } from "../lib/dashboard/types";
 import { matchesClientHealthFilter, matchesWorkFilter } from "../lib/dashboard/filters";
 import type { DocumentWorkspaceData } from "../lib/documents/repository";
-import type { TaskWorkspaceData } from "../lib/tasks/repository";
 import type { EmployeeSummary } from "../lib/team/repository";
 import type { TodoWorkspaceData } from "../lib/todos/repository";
 import type { AttendanceWorkspaceData } from "../lib/attendance/repository";
@@ -41,13 +40,14 @@ import type { RegistersWorkspaceData } from "../lib/registers/repository";
 import type { TimesheetWorkspaceData } from "../lib/timesheets/repository";
 import type { InsightsWorkspaceData } from "../lib/insights/repository";
 import type { RegisterFormOptions as RegisterOptions } from "./dashboard/register-dialogs";
+import type { TaskQueueViewData } from "./dashboard/tasks-workspace";
 import type { WorkQueueViewData } from "./dashboard/work-workspace";
 
 type WorkspaceName = "Overview" | "Clients" | "Client Documents" | "My work" | "To-do" | "Attendance" | "Salary" | "Tasks" | "Compliance" | "Documents" | "Calendar" | "Employees" | "Package Setup" | "Client Packages" | "Service Management" | "User Roles Management" | "Billing" | "Registers" | "Timesheets" | "Insights";
 
 type TimesheetOptions = { clients: Array<{ id: string; name: string }>; work: Array<{ id: string; label: string }>; tasks: Array<{ id: string; title: string }> };
 
-export default function DashboardClient({ workQueue, attendance, billing, clientDocuments, clientPackages, data, documents, employees, initialWorkspace = "Overview", insights, packageSetup, registerError, registerOptions, registers, roleManagement, roleSaved, salary, serviceManagement, tasks, timesheetError, timesheetOptions, timesheets, todos, unreadNotifications = 0, viewer }: { workQueue: WorkQueueViewData; attendance: AttendanceWorkspaceData; billing: BillingWorkspaceData; clientDocuments: ClientDocumentLibrary; insights: InsightsWorkspaceData; registerError?: string; registerOptions: RegisterOptions; registers: RegistersWorkspaceData; timesheetError?: string; timesheetOptions: TimesheetOptions; timesheets: TimesheetWorkspaceData; clientPackages: ClientPackageWorkspaceData; data: DashboardData; documents: DocumentWorkspaceData; employees: EmployeeSummary[]; initialWorkspace?: WorkspaceName; packageSetup: PackageSetupWorkspaceData; roleManagement: RoleManagementWorkspace; roleSaved?: string; salary: SalaryWorkspaceData; serviceManagement: ServiceManagementWorkspaceData; tasks: TaskWorkspaceData; todos: TodoWorkspaceData; unreadNotifications?: number; viewer?: AuthViewer }) {
+export default function DashboardClient({ taskQueue, workQueue, attendance, billing, clientDocuments, clientPackages, data, documents, employees, initialWorkspace = "Overview", insights, packageSetup, registerError, registerOptions, registers, roleManagement, roleSaved, salary, serviceManagement, timesheetError, timesheetOptions, timesheets, todos, unreadNotifications = 0, viewer }: { taskQueue: TaskQueueViewData; workQueue: WorkQueueViewData; attendance: AttendanceWorkspaceData; billing: BillingWorkspaceData; clientDocuments: ClientDocumentLibrary; insights: InsightsWorkspaceData; registerError?: string; registerOptions: RegisterOptions; registers: RegistersWorkspaceData; timesheetError?: string; timesheetOptions: TimesheetOptions; timesheets: TimesheetWorkspaceData; clientPackages: ClientPackageWorkspaceData; data: DashboardData; documents: DocumentWorkspaceData; employees: EmployeeSummary[]; initialWorkspace?: WorkspaceName; packageSetup: PackageSetupWorkspaceData; roleManagement: RoleManagementWorkspace; roleSaved?: string; salary: SalaryWorkspaceData; serviceManagement: ServiceManagementWorkspaceData; todos: TodoWorkspaceData; unreadNotifications?: number; viewer?: AuthViewer }) {
   const router = useRouter();
   const [active, setActive] = useState<string>(initialWorkspace);
   const [filter, setFilter] = useState<OverviewFilter>("All");
@@ -112,7 +112,7 @@ export default function DashboardClient({ workQueue, attendance, billing, client
       ) : active === "Salary" ? (
         <SalaryWorkspace canApprove={Boolean(viewer && hasPermission(viewer, "salary:approve"))} data={salary} />
       ) : active === "Tasks" ? (
-        <TasksWorkspace canAssign={Boolean(viewer && hasPermission(viewer, "tasks:assign"))} viewerUserId={viewer?.userId} workspace={tasks} />
+        <TasksWorkspace {...taskQueue} canAssign={taskQueue.canAssign && Boolean(viewer && hasPermission(viewer, "tasks:assign"))} />
       ) : active === "Compliance" ? (
         <ComplianceWorkspace canWrite={canWriteWork} data={data} />
       ) : active === "Client Documents" ? (

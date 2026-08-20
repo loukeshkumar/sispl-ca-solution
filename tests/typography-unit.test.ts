@@ -11,10 +11,10 @@ const tokenSizes: Record<string, number> = {
   "var(--type-card-title)": 18,
   "var(--type-kpi)": 26,
   "var(--type-nav)": 14,
-  "var(--type-primary)": 13,
-  "var(--type-supporting)": 12,
-  "var(--type-label)": 11,
-  "var(--type-compact)": 11,
+  "var(--type-primary)": 14,
+  "var(--type-supporting)": 13,
+  "var(--type-label)": 12,
+  "var(--type-compact)": 12,
 };
 
 const propertyFor = (selector: string, property: string) => {
@@ -51,17 +51,18 @@ const contrastRatio = (foreground: string, background: string) => {
 
 test("dashboard uses Geist and the approved readable type scale", () => {
   assert.match(css, /font-family:\s*var\(--font-geist-sans\)/);
-  assert.equal(propertyFor("body", "font-size"), "15px");
+  assert.equal(propertyFor("body", "font-size"), "16px", "mobile body copy must remain at least 16px");
+  assert.match(css, /body\s*\{[\s\S]*?font-size:\s*15px/);
 
   for (const [token, value] of [
     ["--type-page-title", "32px"],
     ["--type-card-title", "18px"],
     ["--type-kpi", "26px"],
     ["--type-nav", "14px"],
-    ["--type-primary", "13px"],
-    ["--type-supporting", "12px"],
-    ["--type-label", "11px"],
-    ["--type-compact", "11px"],
+    ["--type-primary", "14px"],
+    ["--type-supporting", "13px"],
+    ["--type-label", "12px"],
+    ["--type-compact", "12px"],
   ] as const) assert.equal(tokenValue(token), value, `${token} must remain ${value}`);
 });
 
@@ -81,11 +82,11 @@ test("semantic dashboard text uses the approved scale", () => {
   ] as const) assert.equal(propertyFor(selector, "font-size"), token, `${selector} must use ${token}`);
 });
 
-test("all CSS font sizes keep the 11px floor", () => {
+test("all CSS font sizes keep the 12px floor", () => {
   root.walkDecls("font-size", (declaration) => {
     const value = declaration.value.trim();
     const size = tokenSizes[value] ?? Number(value.replace("px", ""));
-    assert.ok(Number.isFinite(size) && size >= 11, `sub-11px font-size declaration: ${value}`);
+    assert.ok(Number.isFinite(size) && size >= 12, `sub-12px font-size declaration: ${value}`);
   });
 });
 

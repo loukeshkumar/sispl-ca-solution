@@ -27,9 +27,10 @@ test("dashboard is decomposed into the approved workspace boundaries", async () 
   assert.match(shell, /aria-label="Primary navigation"/);
   assert.match(shell, /aria-label="Open navigation"/);
   assert.match(shell, /aria-label="Notifications"/);
-  assert.match(overview, /overview-summary-ribbon/);
+  assert.match(overview, /overview-kpi-grid/);
+  assert.match(overview, /<OverviewAnalytics/);
   assert.match(overview, /priority-queue-panel/);
-  assert.match(overview, /Team capacity/);
+  assert.doesNotMatch(overview, /overview-summary-ribbon|Team capacity/);
   assert.match(clients, /client-portfolio-panel/);
   assert.match(clients, /client-detail-panel/);
 });
@@ -43,9 +44,9 @@ test("layout CSS implements the approved grid and responsive transformations", a
     "--command-bar-height:72px",
     "--page-pad:32px",
     "--grid-gap:16px",
-    ".overview-main{display:grid;grid-template-columns:repeat(12,minmax(0,1fr))",
-    ".priority-queue-panel{grid-column:span8",
-    ".overview-insights{grid-column:span4",
+    ".overview-analytics{display:grid",
+    ".overview-kpi-grid{grid-template-columns:repeat(5,minmax(0,1fr))",
+    ".analytics-gauge-grid{display:grid",
     ".clients-main{display:grid;grid-template-columns:repeat(12,minmax(0,1fr))",
     ".client-portfolio-panel{grid-column:span8",
     ".client-detail-panel{grid-column:span4",
@@ -86,11 +87,28 @@ test("tablet layouts avoid crowded grids and sticky detail overflow", async () =
   const compactCss = css.replace(/\s+/g, "");
 
   assert.doesNotMatch(compactCss, /\.workspace-canvas\{[^}]*max-width:/);
-  assert.doesNotMatch(compactCss, /button\.kpi-card:hover[^}]*transform:/);
+  assert.match(compactCss, /button\.kpi-card:hover[^}]*transform:translateY\(-2px\)/);
+  assert.match(compactCss, /@media\(prefers-reduced-motion:reduce\)[\s\S]*button\.kpi-card:hover[\s\S]*transform:none!important/);
   assert.match(compactCss, /\.dashboard-sidebar\{[^}]*overflow-y:auto/);
   assert.match(compactCss, /\.client-detail-body\{[^}]*max-height:calc\(100vh-var\(--command-bar-height\)-190px\)[^}]*overflow-y:auto/);
   assert.match(compactCss, /@media\(max-width:1535px\)[\s\S]*\.portfolio-list-head,.portfolio-row\{grid-template-columns:minmax\(180px,2fr\)/);
   assert.match(compactCss, /@media\(max-width:1499px\)[\s\S]*\.work-list-head,.work-row\{grid-template-columns:minmax\(205px,2fr\)/);
-  assert.match(compactCss, /@media\(max-width:1199px\)[\s\S]*\.priority-queue-panel,.overview-insights\{grid-column:1\/-1/);
+  assert.match(compactCss, /@media\(max-width:1439px\)[\s\S]*\.overview-kpi-grid\{grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/);
+  assert.match(compactCss, /@media\(max-width:1023px\)[\s\S]*\.overview-analytics\{grid-template-columns:1fr/);
   assert.match(compactCss, /@media\(max-width:1149px\)[\s\S]*\.client-detail-body\{max-height:none;overflow:visible/);
+});
+
+test("the persistent shell uses Lucide icons and exposes theme switching", async () => {
+  const [icons, shell] = await Promise.all([
+    read("app/dashboard/dashboard-icons.tsx"),
+    read("app/dashboard/dashboard-shell.tsx"),
+  ]);
+
+  assert.match(icons, /from "lucide-react"/);
+  for (const name of ["overview", "work", "clients", "compliance", "documents", "calendar", "team", "insights", "search", "bell", "sun", "moon"]) {
+    assert.match(icons, new RegExp(`\\b${name}:`), `missing Lucide mapping for ${name}`);
+  }
+  assert.doesNotMatch(icons, /iconPaths/);
+  assert.match(shell, /import \{ ThemeToggle \}/);
+  assert.match(shell, /<ThemeToggle \/>/);
 });

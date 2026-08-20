@@ -23,7 +23,9 @@ import { getCapacityLanes, getQueueTotals, listWorkQueue } from "../lib/work/que
 import { DEFAULT_WORK_QUEUE_PARAMS } from "../lib/work/queue-params";
 import { getSeedCounts, seedDevelopmentData } from "../scripts/db/seed";
 import { createEmployee, disableEmployee, getEmployee360, listEmployees, provisionEmployeeAccess, TeamRepositoryError, updateEmployee } from "../lib/team/repository";
-import { completeOfficeTask, createOfficeTask, getTask360, listTaskWorkspace, TaskRepositoryError, updateOfficeTask, updateOwnTaskStatus } from "../lib/tasks/repository";
+import { applyBulkTaskChange, completeOfficeTask, createOfficeTask, getTask360, listTaskWorkspace, TaskRepositoryError, updateOfficeTask, updateOwnTaskStatus } from "../lib/tasks/repository";
+import { getTaskCapacityLanes, listTaskQueue } from "../lib/tasks/queue";
+import { DEFAULT_TASK_QUEUE_PARAMS } from "../lib/tasks/queue-params";
 import { archiveTodo, completeTodo, createTodo, getTodo, listTodoWorkspace, reopenTodo, TodoRepositoryError, updateTodo } from "../lib/todos/repository";
 import { createAttendancePolicy, getAttendanceWorkspace, lockAttendancePeriod, moveAttendancePeriodToReview, prepareAttendancePeriod, recordManualAttendance, reopenAttendancePeriod, AttendanceRepositoryError } from "../lib/attendance/repository";
 import { eligibleWorkingDateKeys, workingDateKeys } from "../lib/attendance/calculations";
@@ -594,6 +596,7 @@ test("employee disabling and task assignment serialize on the membership boundar
       createOfficeTask(database, identity.tenantId, identity.userId, {
         assigneeId: created.userId,
         blockerNote: "",
+        estimateMinutes: null,
         description: "Concurrent assignment integrity check.",
         dueDate: "2026-08-30",
         legalEntityId: null,
@@ -678,6 +681,7 @@ test("office tasks enforce tenant context, employee ownership, and atomic comple
     () => createOfficeTask(database, identity.tenantId, identity.userId, {
       assigneeId,
       blockerNote: "",
+      estimateMinutes: null,
       description: "Prepare the reconciliation working papers.",
       dueDate: "2026-08-25",
       legalEntityId: "40000000-0000-4000-8000-000000000002",
@@ -693,6 +697,7 @@ test("office tasks enforce tenant context, employee ownership, and atomic comple
   const taskId = await createOfficeTask(database, identity.tenantId, identity.userId, {
     assigneeId,
     blockerNote: "",
+    estimateMinutes: null,
     description: "Prepare the reconciliation working papers.",
     dueDate: "2026-08-25",
     legalEntityId,
@@ -713,6 +718,7 @@ test("office tasks enforce tenant context, employee ownership, and atomic comple
     await assert.rejects(() => updateOfficeTask(database, identity.tenantId, identity.userId, taskId, {
       assigneeId,
       blockerNote: "",
+      estimateMinutes: null,
       description: "Attempted manager-owned status change.",
       dueDate: "2026-08-25",
       legalEntityId,
@@ -1562,6 +1568,136 @@ test("capacity lanes derive availability from the configured shift", async () =>
       assert.ok(week.loadMinutes >= 0);
       assert.ok(week.unbudgetedCount >= 0);
       assert.equal(week.availableMinutes, lane.availableMinutes);
+    }
+  }
+});
+
+test("task queue scopes are tenant-isolated and cannot be widened past the access floor", async () => {
+  const database = getDatabase();
+  await seedDevelopmentData(database);
+  const identity = await findLoginIdentity(database, "loukesh@example.invalid", "sharma-kumar-ca");
+  assert.ok(identity);
+  const firm = { ...DEFAULT_TASK_QUEUE_PARAMS, scope: "firm" as const };
+
+  const rows = await listTaskQueue(database, identity.tenantId, identity.userId, identity.roleKey, firm);
+  const foreign = await database.select({ id: officeTasks.id }).from(officeTasks).where(ne(officeTasks.tenantId, identity.tenantId));
+  assert.deepEqual(
+    rows.filter((row) => foreign.some((other) => other.id === row.id)),
+    [],
+    "no other tenant task may appear in any scope",
+  );
+
+  // An associate asking for the firm scope through the query string must still
+  // only receive their own assignments.
+  const [associate] = await database.select({ userId: tenantMemberships.userId }).from(tenantMemberships).where(and(
+    eq(tenantMemberships.tenantId, identity.tenantId), eq(tenantMemberships.roleKey, "associate"),
+  )).limit(1);
+  assert.ok(associate, "the seed provides an associate");
+  const widened = await listTaskQueue(database, identity.tenantId, associate.userId, "associate", firm);
+  assert.ok(
+    widened.every((row) => row.assigneeId === associate.userId),
+    "the access floor must hold against a hand-edited scope",
+  );
+});
+
+test("task queue orders by deadline then urgency, and by urgency first on request", async () => {
+  const database = getDatabase();
+  await seedDevelopmentData(database);
+  const identity = await findLoginIdentity(database, "loukesh@example.invalid", "sharma-kumar-ca");
+  assert.ok(identity);
+  const rank = { urgent: 0, high: 1, normal: 2, low: 3 } as Record<string, number>;
+
+  const byDue = await listTaskQueue(database, identity.tenantId, identity.userId, identity.roleKey, { ...DEFAULT_TASK_QUEUE_PARAMS, scope: "firm" });
+  for (let index = 1; index < byDue.length; index += 1) {
+    const previous = byDue[index - 1]!;
+    const current = byDue[index]!;
+    assert.ok(previous.dueDate <= current.dueDate, "deadline order holds");
+    // Ties inside a single day resolve by urgency, not by planner order.
+    if (previous.dueDate === current.dueDate) assert.ok(rank[previous.priority]! <= rank[current.priority]!);
+  }
+
+  const byPriority = await listTaskQueue(database, identity.tenantId, identity.userId, identity.roleKey, { ...DEFAULT_TASK_QUEUE_PARAMS, scope: "firm", sort: "priority" });
+  for (let index = 1; index < byPriority.length; index += 1) {
+    assert.ok(rank[byPriority[index - 1]!.priority]! <= rank[byPriority[index]!.priority]!, "urgency leads");
+  }
+});
+
+test("a bulk task reassign applies the valid subset, reports the rest, and audits per task", async () => {
+  const database = getDatabase();
+  await seedDevelopmentData(database);
+  const identity = await findLoginIdentity(database, "loukesh@example.invalid", "sharma-kumar-ca");
+  assert.ok(identity);
+  const members = await listWorkMembers(database, identity.tenantId);
+  const assignee = members.find((member) => member.id !== identity.userId);
+  const reviewer = members.find((member) => member.id !== identity.userId && member.id !== assignee?.id);
+  assert.ok(assignee && reviewer, "the seed provides several active members");
+  const suffix = randomUUID().slice(0, 8);
+  const created: string[] = [];
+
+  try {
+    const reviewerHeld = await createOfficeTask(database, identity.tenantId, identity.userId, {
+      assigneeId: assignee.id, blockerNote: "", estimateMinutes: null, description: "Bulk guard",
+      dueDate: "2026-09-15", legalEntityId: null, priority: "normal", reviewerId: reviewer.id,
+      status: "todo", title: `Bulk A ${suffix}`, workItemId: null,
+    });
+    created.push(reviewerHeld);
+    const plain = await createOfficeTask(database, identity.tenantId, identity.userId, {
+      assigneeId: assignee.id, blockerNote: "", estimateMinutes: 90, description: "Bulk plain",
+      dueDate: "2026-09-16", legalEntityId: null, priority: "normal", reviewerId: null,
+      status: "todo", title: `Bulk B ${suffix}`, workItemId: null,
+    });
+    created.push(plain);
+
+    const plan = await applyBulkTaskChange(database, identity.tenantId, identity.userId, [reviewerHeld, plain], { kind: "assignee", memberId: reviewer.id });
+    assert.equal(plan.apply.length, 1);
+    assert.equal(plan.apply[0]?.id, plain);
+    assert.equal(plan.skip.length, 1);
+    assert.equal(plan.skip[0]?.id, reviewerHeld);
+    assert.match(plan.skip[0]!.reason, /already reviews/i);
+
+    const after = await database.select({ assigneeId: officeTasks.assigneeId, id: officeTasks.id }).from(officeTasks).where(and(
+      eq(officeTasks.tenantId, identity.tenantId), inArray(officeTasks.id, [reviewerHeld, plain]),
+    ));
+    assert.equal(after.find((task) => task.id === reviewerHeld)?.assigneeId, assignee.id, "a skipped task is untouched");
+    assert.equal(after.find((task) => task.id === plain)?.assigneeId, reviewer.id);
+
+    const [applied] = await database.select({ value: count() }).from(auditEvents).where(and(
+      eq(auditEvents.tenantId, identity.tenantId),
+      eq(auditEvents.resourceId, plain),
+      eq(auditEvents.action, "task.bulk.assignee"),
+    ));
+    assert.equal(applied?.value, 1, "one audit event per changed task, not one per batch");
+    const [untouched] = await database.select({ value: count() }).from(auditEvents).where(and(
+      eq(auditEvents.tenantId, identity.tenantId),
+      eq(auditEvents.resourceId, reviewerHeld),
+      eq(auditEvents.action, "task.bulk.assignee"),
+    ));
+    assert.equal(untouched?.value, 0, "a skipped task must not be audited as changed");
+  } finally {
+    for (const id of created) {
+      await database.delete(notificationDeliveries).where(inArray(notificationDeliveries.notificationId,
+        database.select({ id: notifications.id }).from(notifications).where(eq(notifications.resourceId, id))));
+      await database.delete(notifications).where(eq(notifications.resourceId, id));
+      await database.delete(auditEvents).where(eq(auditEvents.resourceId, id));
+      await database.delete(officeTasks).where(eq(officeTasks.id, id));
+    }
+  }
+});
+
+test("task capacity lanes derive availability from the configured shift", async () => {
+  const database = getDatabase();
+  await seedDevelopmentData(database);
+  const identity = await findLoginIdentity(database, "loukesh@example.invalid", "sharma-kumar-ca");
+  assert.ok(identity);
+  const lanes = await getTaskCapacityLanes(database, identity.tenantId, "2026-08-21");
+  assert.ok(lanes.length > 0, "seeded employees hold attendance work profiles");
+  for (const lane of lanes) {
+    assert.equal(lane.weeks.length, 4);
+    // The seeded Bihar shift is 450 full-day minutes across a six-day mask.
+    assert.equal(lane.availableMinutes, 2700);
+    for (const week of lane.weeks) {
+      assert.ok(week.loadMinutes >= 0);
+      assert.ok(week.unestimatedCount >= 0);
     }
   }
 });

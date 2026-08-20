@@ -2,8 +2,22 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { demoDashboardRecords, SEEDED_TENANT_ID, SEEDED_TENANT_SLUG } from "../lib/dashboard/fixtures";
-import { getPostgresDashboardData } from "../lib/dashboard/postgres/provider";
+import { getPostgresDashboardData, getPostgresDashboardDataForTenant } from "../lib/dashboard/postgres/provider";
 import { findTenantIdBySlug, loadDashboardRecords } from "../lib/dashboard/postgres/repository";
+import { resolveTestDatabaseUrl } from "../lib/dashboard/postgres/test-config";
+
+test("integration database URLs are isolated from the development database", () => {
+  const derived = new URL(resolveTestDatabaseUrl({ DATABASE_URL: "postgresql://user:secret@localhost:5432/sispl_local" }));
+  assert.equal(derived.pathname, "/sispl_local_test");
+  assert.throws(() => resolveTestDatabaseUrl({
+    DATABASE_URL: "postgresql://user:secret@localhost:5432/sispl_local",
+    DATABASE_URL_TEST: "postgresql://user:secret@localhost:5432/sispl_local",
+  }), /separate database/);
+  assert.throws(() => resolveTestDatabaseUrl({
+    DATABASE_URL: "postgresql://user:secret@localhost:5432/sispl_local",
+    DATABASE_URL_TEST: "postgresql://user:secret@localhost:5432/shared_ci",
+  }), /ends with _test/);
+});
 
 test("repository rejects an empty tenant id before querying", async () => {
   let queried = false;
@@ -66,4 +80,22 @@ test("PostgreSQL provider does not continue when the seeded tenant is missing", 
     /Seeded tenant .* was not found/,
   );
   assert.equal(repositoryCalled, false);
+});
+
+test("authenticated PostgreSQL provider loads only the explicit session tenant", async () => {
+  let receivedTenantId = "";
+  const dashboard = await getPostgresDashboardDataForTenant(
+    SEEDED_TENANT_ID,
+    new Date("2026-08-15T09:00:00+05:30"),
+    {
+      getDatabase: () => ({}) as never,
+      loadDashboardRecords: async (_database, tenantId) => {
+        receivedTenantId = tenantId;
+        return demoDashboardRecords;
+      },
+    },
+  );
+
+  assert.equal(receivedTenantId, SEEDED_TENANT_ID);
+  assert.equal(dashboard.source, "postgres");
 });

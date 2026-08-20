@@ -5,6 +5,7 @@ import { readPostgresConfig } from "../lib/dashboard/config";
 import { demoDashboardRecords } from "../lib/dashboard/fixtures";
 import { mapDashboardRecords } from "../lib/dashboard/mapper";
 import { getDashboardDataForConfiguredSource } from "../lib/dashboard/provider";
+import { matchesClientHealthFilter, matchesWorkFilter } from "../lib/dashboard/filters";
 
 test("PostgreSQL configuration maps pool-only URL parameters without losing driver parameters", () => {
   const config = readPostgresConfig({
@@ -93,4 +94,28 @@ test("an omitted data source selects deterministic demo data", async () => {
 
   assert.equal(dashboard.source, "demo");
   assert.equal(dashboard.clients.length, 5);
+});
+
+test("completed work is counted but excluded from active attention queues", () => {
+  const completedRecord = { ...demoDashboardRecords.workItems[0]!, status: "completed" as const, progress: 100 };
+  const dashboard = mapDashboardRecords({
+    ...demoDashboardRecords,
+    workItems: [completedRecord, ...demoDashboardRecords.workItems.slice(1)],
+  }, new Date("2026-08-15T09:00:00+05:30"));
+
+  assert.equal(dashboard.metrics.completed, 1);
+  assert.equal(dashboard.metrics.attentionNeeded, 3);
+  assert.equal(dashboard.work.some((item) => item.id === completedRecord.id), false);
+  assert.equal(dashboard.deadlines.some((item) => item.id === completedRecord.id), false);
+});
+
+test("dashboard KPI filters match the metric they advertise", () => {
+  const overdue = { dueDate: "2026-08-15", status: "At risk" as const };
+  const dueSoon = { dueDate: "2026-08-20", status: "Critical" as const };
+  assert.equal(matchesWorkFilter(overdue, "Overdue", "2026-08-16"), true);
+  assert.equal(matchesWorkFilter(dueSoon, "Overdue", "2026-08-16"), false);
+  assert.equal(matchesWorkFilter(dueSoon, "Due this week", "2026-08-16"), true);
+  assert.equal(matchesClientHealthFilter({ risk: "Watch" }, "Need attention"), true);
+  assert.equal(matchesClientHealthFilter({ risk: "Critical" }, "Need attention"), true);
+  assert.equal(matchesClientHealthFilter({ risk: "Healthy" }, "Need attention"), false);
 });
