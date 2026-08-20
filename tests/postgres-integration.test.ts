@@ -18,7 +18,9 @@ import { cancelDocumentRequest, createDocumentRequest, getDocumentMetadata, list
 import { mapDashboardRecords } from "../lib/dashboard/mapper";
 import { closePostgresPool, getDatabase, getPostgresPool } from "../lib/dashboard/postgres/pool";
 import { loadDashboardRecords } from "../lib/dashboard/postgres/repository";
-import { completeWorkItem, createWorkItem, getWorkItem360, listWorkMembers, updateWorkItem } from "../lib/work/repository";
+import { applyBulkWorkChange, completeWorkItem, createWorkItem, getWorkItem360, listWorkClients, listWorkMembers, updateWorkItem } from "../lib/work/repository";
+import { getCapacityLanes, getQueueTotals, listWorkQueue } from "../lib/work/queue";
+import { DEFAULT_WORK_QUEUE_PARAMS } from "../lib/work/queue-params";
 import { getSeedCounts, seedDevelopmentData } from "../scripts/db/seed";
 import { createEmployee, disableEmployee, getEmployee360, listEmployees, provisionEmployeeAccess, TeamRepositoryError, updateEmployee } from "../lib/team/repository";
 import { completeOfficeTask, createOfficeTask, getTask360, listTaskWorkspace, TaskRepositoryError, updateOfficeTask, updateOwnTaskStatus } from "../lib/tasks/repository";
@@ -1400,6 +1402,166 @@ test("disbursement files require an approved run and exclude held or unbanked em
       await database.delete(employeeBankAccounts).where(and(
         eq(employeeBankAccounts.tenantId, identity.tenantId), eq(employeeBankAccounts.employeeUserId, entries[0].employeeUserId),
       ));
+    }
+  }
+});
+
+test("work queue scopes are tenant-isolated and disjoint between assignee and reviewer", async () => {
+  const database = getDatabase();
+  await seedDevelopmentData(database);
+  const identity = await findLoginIdentity(database, "loukesh@example.invalid", "sharma-kumar-ca");
+  assert.ok(identity);
+  const today = "2026-08-20";
+  const firm = { ...DEFAULT_WORK_QUEUE_PARAMS, scope: "firm" as const };
+
+  const rows = await listWorkQueue(database, identity.tenantId, identity.userId, firm, today);
+  const foreign = await database.select({ id: workItems.id }).from(workItems).where(ne(workItems.tenantId, identity.tenantId));
+  assert.deepEqual(
+    rows.filter((row) => foreign.some((other) => other.id === row.id)),
+    [],
+    "no other tenant work item may appear in any scope, including the firm scope",
+  );
+
+  const members = await listWorkMembers(database, identity.tenantId);
+  for (const member of members) {
+    const mine = await listWorkQueue(database, identity.tenantId, member.id, { ...DEFAULT_WORK_QUEUE_PARAMS, scope: "mine" }, today);
+    const reviewing = await listWorkQueue(database, identity.tenantId, member.id, { ...DEFAULT_WORK_QUEUE_PARAMS, scope: "reviewing" }, today);
+    assert.ok(mine.every((row) => row.assigneeId === member.id), `${member.fullName} mine scope must only hold their assignments`);
+    assert.ok(reviewing.every((row) => row.reviewerId === member.id), `${member.fullName} reviewing scope must only hold their reviews`);
+    // The separation-of-duties check guarantees these cannot overlap.
+    assert.deepEqual(mine.filter((row) => reviewing.some((other) => other.id === row.id)), []);
+    const totals = await getQueueTotals(database, identity.tenantId, member.id, { ...DEFAULT_WORK_QUEUE_PARAMS, scope: "mine" }, today);
+    assert.equal(totals.active, mine.length, "the headline count must describe the list beneath it");
+  }
+});
+
+test("a work item budget is a snapshot that later service-standard edits never rewrite", async () => {
+  const database = getDatabase();
+  await seedDevelopmentData(database);
+  const identity = await findLoginIdentity(database, "loukesh@example.invalid", "sharma-kumar-ca");
+  assert.ok(identity);
+  // The client and service must come from a real entitlement: creation refuses
+  // a service outside the client's active package.
+  const entitled = (await listWorkClients(database, identity.tenantId)).find((option) => option.services.length > 0);
+  assert.ok(entitled, "the seed entitles at least one client to a service");
+  const client = { id: entitled.id };
+  const serviceCode = entitled.services[0]!.key;
+  const catalogue = await listServiceManagementWorkspace(database, identity.tenantId);
+  const audit = catalogue.services.find((service) => service.code.toUpperCase() === serviceCode.toUpperCase());
+  assert.ok(audit, "the entitled service exists in the catalogue");
+  const originalStandard = audit.standardMinutes;
+  const suffix = randomUUID().slice(0, 8);
+  const created: string[] = [];
+
+  try {
+    await updateService(database, identity.tenantId, identity.userId, audit.id, { ...audit, standardMinutes: 90 });
+    const first = await createWorkItem(database, identity.tenantId, identity.userId, {
+      assigneeId: identity.userId, blockerNote: "", budgetMinutes: null, internalDueDate: "2026-09-10",
+      legalEntityId: client.id, missingItemCount: 0, periodKey: `Budget A ${suffix}`, progress: 0,
+      reviewerId: null, serviceKey: serviceCode, statutoryDueDate: "2026-09-15", status: "at_risk",
+    });
+    created.push(first);
+    assert.equal((await getWorkItem360(database, identity.tenantId, first))?.budgetMinutes, 90, "a new item copies the standard");
+
+    await updateService(database, identity.tenantId, identity.userId, audit.id, { ...audit, standardMinutes: 150 });
+    assert.equal(
+      (await getWorkItem360(database, identity.tenantId, first))?.budgetMinutes,
+      90,
+      "the existing budget is a snapshot, not a live join",
+    );
+
+    const second = await createWorkItem(database, identity.tenantId, identity.userId, {
+      assigneeId: identity.userId, blockerNote: "", budgetMinutes: null, internalDueDate: "2026-10-10",
+      legalEntityId: client.id, missingItemCount: 0, periodKey: `Budget B ${suffix}`, progress: 0,
+      reviewerId: null, serviceKey: serviceCode, statutoryDueDate: "2026-10-15", status: "at_risk",
+    });
+    created.push(second);
+    assert.equal((await getWorkItem360(database, identity.tenantId, second))?.budgetMinutes, 150, "a later item picks up the new standard");
+  } finally {
+    await updateService(database, identity.tenantId, identity.userId, audit.id, { ...audit, standardMinutes: originalStandard });
+    for (const id of created) {
+      await database.delete(auditEvents).where(eq(auditEvents.resourceId, id));
+      await database.delete(workItems).where(eq(workItems.id, id));
+    }
+  }
+});
+
+test("a bulk reassign applies the valid subset, reports the rest, and audits per item", async () => {
+  const database = getDatabase();
+  await seedDevelopmentData(database);
+  const identity = await findLoginIdentity(database, "loukesh@example.invalid", "sharma-kumar-ca");
+  assert.ok(identity);
+  const entitled = (await listWorkClients(database, identity.tenantId)).find((option) => option.services.length > 0);
+  assert.ok(entitled, "the seed entitles at least one client to a service");
+  const client = { id: entitled.id };
+  const serviceCode = entitled.services[0]!.key;
+  const members = await listWorkMembers(database, identity.tenantId);
+  const reviewer = members.find((member) => member.id !== identity.userId);
+  assert.ok(reviewer, "the seed provides more than one active member");
+  const suffix = randomUUID().slice(0, 8);
+  const created: string[] = [];
+
+  try {
+    const reviewerHeld = await createWorkItem(database, identity.tenantId, identity.userId, {
+      assigneeId: identity.userId, blockerNote: "", budgetMinutes: null, internalDueDate: "2026-09-10",
+      legalEntityId: client.id, missingItemCount: 0, periodKey: `Bulk A ${suffix}`, progress: 0,
+      reviewerId: reviewer.id, serviceKey: serviceCode, statutoryDueDate: "2026-09-15", status: "at_risk",
+    });
+    created.push(reviewerHeld);
+    const plain = await createWorkItem(database, identity.tenantId, identity.userId, {
+      assigneeId: identity.userId, blockerNote: "", budgetMinutes: null, internalDueDate: "2026-09-11",
+      legalEntityId: client.id, missingItemCount: 0, periodKey: `Bulk B ${suffix}`, progress: 0,
+      reviewerId: null, serviceKey: serviceCode, statutoryDueDate: "2026-09-16", status: "at_risk",
+    });
+    created.push(plain);
+
+    const plan = await applyBulkWorkChange(database, identity.tenantId, identity.userId, [reviewerHeld, plain], { kind: "assignee", memberId: reviewer.id });
+    assert.equal(plan.apply.length, 1);
+    assert.equal(plan.apply[0]?.id, plain);
+    assert.equal(plan.skip.length, 1);
+    assert.equal(plan.skip[0]?.id, reviewerHeld);
+    assert.match(plan.skip[0]!.reason, /already reviews/i);
+
+    // The skipped item must be untouched, not partially written.
+    assert.equal((await getWorkItem360(database, identity.tenantId, reviewerHeld))?.assigneeId, identity.userId);
+    assert.equal((await getWorkItem360(database, identity.tenantId, plain))?.assigneeId, reviewer.id);
+
+    const [applied] = await database.select({ value: count() }).from(auditEvents).where(and(
+      eq(auditEvents.tenantId, identity.tenantId),
+      eq(auditEvents.resourceId, plain),
+      eq(auditEvents.action, "work.bulk.assignee"),
+    ));
+    assert.equal(applied?.value, 1, "one audit event per changed item, not one per batch");
+    const [untouched] = await database.select({ value: count() }).from(auditEvents).where(and(
+      eq(auditEvents.tenantId, identity.tenantId),
+      eq(auditEvents.resourceId, reviewerHeld),
+      eq(auditEvents.action, "work.bulk.assignee"),
+    ));
+    assert.equal(untouched?.value, 0, "a skipped item must not be audited as changed");
+  } finally {
+    for (const id of created) {
+      await database.delete(auditEvents).where(eq(auditEvents.resourceId, id));
+      await database.delete(workItems).where(eq(workItems.id, id));
+    }
+  }
+});
+
+test("capacity lanes derive availability from the configured shift", async () => {
+  const database = getDatabase();
+  await seedDevelopmentData(database);
+  const identity = await findLoginIdentity(database, "loukesh@example.invalid", "sharma-kumar-ca");
+  assert.ok(identity);
+  const lanes = await getCapacityLanes(database, identity.tenantId, "2026-08-20");
+  assert.ok(lanes.length > 0, "seeded employees hold attendance work profiles");
+  for (const lane of lanes) {
+    assert.equal(lane.weeks.length, 4, "the horizon is four weeks");
+    // The seeded Bihar shift is 450 full-day minutes across a six-day mask.
+    assert.equal(lane.availableMinutes, 2700);
+    assert.deepEqual(lane.weeks.map((week) => week.weekStart), ["2026-08-17", "2026-08-24", "2026-08-31", "2026-09-07"]);
+    for (const week of lane.weeks) {
+      assert.ok(week.loadMinutes >= 0);
+      assert.ok(week.unbudgetedCount >= 0);
+      assert.equal(week.availableMinutes, lane.availableMinutes);
     }
   }
 });
