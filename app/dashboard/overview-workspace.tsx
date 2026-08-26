@@ -1,53 +1,52 @@
+import Link from "next/link";
+
 import type { DashboardData, DashboardWorkItem, WorkStatus } from "../../lib/dashboard/types";
+import type { WorkFilter } from "../../lib/dashboard/filters";
 import { DashboardIcon } from "./dashboard-icons";
-import { InitialsAvatar, KpiCard, PageTitle, ProgressBar, StatusBadge } from "./dashboard-ui";
+import { EmptyState, InitialsAvatar, KpiCard, PageTitle, ProgressBar, StatusBadge } from "./dashboard-ui";
+import { OverviewAnalytics } from "./overview-analytics";
+import { TodoWidget } from "./todo-widget";
+import type { TodoWorkspaceData } from "../../lib/todos/repository";
 
-export type OverviewFilter = "All" | WorkStatus;
+export type OverviewFilter = WorkFilter;
 
-const filters: OverviewFilter[] = ["All", "Critical", "At risk", "Waiting", "Review"];
-
+const filters: OverviewFilter[] = ["All", "Overdue", "Due this week", "Critical", "At risk", "Waiting", "Review"];
 const displayNumber = (value: number) => value.toString().padStart(2, "0");
 const statusTone = (status: WorkStatus) => ({
   "At risk": "amber",
   Critical: "red",
   Review: "mint",
   Waiting: "blue",
+  Completed: "mint",
 })[status];
 
-function SummaryRibbon({ data, onOpenMyWork }: { data: DashboardData; onOpenMyWork: () => void }) {
-  return (
-    <section className="overview-summary-ribbon" aria-label="Today's operations summary">
-      <div className="summary-ribbon-primary">
-        <span className="summary-ribbon-icon"><DashboardIcon name="alert" /></span>
-        <div>
-          <strong>{data.metrics.attentionNeeded} deadlines need attention</strong>
-          <p className="summary-ribbon-copy">{data.metrics.waitingOnClient} waiting on clients · {data.metrics.pendingReview} pending review</p>
-        </div>
-      </div>
-      <div className="summary-ribbon-rate">
-        <span>ON-TIME RATE</span>
-        <strong>{data.metrics.onTimeRate}%</strong>
-      </div>
-      <button className="summary-ribbon-action" onClick={onOpenMyWork} type="button">Review priority work <DashboardIcon name="arrow" size={17} /></button>
-    </section>
-  );
+function activeOwnerWorkloads(data: DashboardData) {
+  const workloads = new Map<string, number>();
+  for (const item of data.work) {
+    if (item.status === "Completed") continue;
+    workloads.set(item.owner, (workloads.get(item.owner) ?? 0) + 1);
+  }
+  return Array.from(workloads.values());
 }
 
 function OverviewKpis({
   data,
   filter,
   onFilterChange,
+  onOpenMyWork,
 }: {
   data: DashboardData;
   filter: OverviewFilter;
   onFilterChange: (filter: OverviewFilter) => void;
+  onOpenMyWork: () => void;
 }) {
   return (
-    <section aria-label="Practice work metrics" className="kpi-grid">
-      <KpiCard icon="alert" label="OVERDUE" note="Live from work items" onClick={() => onFilterChange("Critical")} pressed={filter === "Critical"} tone="red" value={displayNumber(data.metrics.overdue)} />
-      <KpiCard icon="clock" label="DUE THIS WEEK" note="Next seven days" onClick={() => onFilterChange("At risk")} pressed={filter === "At risk"} tone="amber" value={displayNumber(data.metrics.dueThisWeek)} />
-      <KpiCard icon="waiting" label="WAITING ON CLIENT" note="Blocked work items" onClick={() => onFilterChange("Waiting")} pressed={filter === "Waiting"} tone="blue" value={displayNumber(data.metrics.waitingOnClient)} />
-      <KpiCard icon="review" label="PENDING REVIEW" note="Review queue" onClick={() => onFilterChange("Review")} pressed={filter === "Review"} tone="mint" value={displayNumber(data.metrics.pendingReview)} />
+    <section aria-label="Practice work metrics" className="overview-kpi-grid kpi-grid">
+      <KpiCard icon="alert" label="ATTENTION NEEDED" note={`${data.metrics.overdue} overdue · ${data.metrics.waitingOnClient} waiting`} onClick={onOpenMyWork} sparkValues={[data.metrics.overdue, data.metrics.waitingOnClient, data.metrics.pendingReview, data.metrics.criticalClients]} tone="red" value={displayNumber(data.metrics.attentionNeeded)} />
+      <KpiCard icon="review" label="ON-TIME RATE" note={`${data.metrics.completed} recorded completions`} sparkValues={[data.metrics.completed, data.metrics.attentionNeeded]} tone="mint" value={`${data.metrics.onTimeRate}%`} />
+      <KpiCard icon="insights" label="PORTFOLIO HEALTH" note={`${data.metrics.criticalClients} critical clients`} sparkValues={data.serviceHealth.map((service) => service.value)} tone="blue" value={`${data.metrics.averageHealth}%`} />
+      <KpiCard icon="clock" label="DUE THIS WEEK" note="Next seven days" onClick={() => onFilterChange("Due this week")} pressed={filter === "Due this week"} sparkValues={[data.metrics.overdue, data.metrics.dueThisWeek, data.metrics.pendingReview]} tone="amber" value={displayNumber(data.metrics.dueThisWeek)} />
+      <KpiCard icon="team" label="ACTIVE EMPLOYEES" note="Enabled firm members" sparkValues={activeOwnerWorkloads(data)} tone="mint" value={displayNumber(data.practice.activeTeamMembers)} />
     </section>
   );
 }
@@ -56,23 +55,32 @@ function PriorityQueue({
   filter,
   items,
   onFilterChange,
+  onOpenMyWork,
+  onQueryChange,
+  query,
 }: {
   filter: OverviewFilter;
   items: DashboardWorkItem[];
   onFilterChange: (filter: OverviewFilter) => void;
+  onOpenMyWork: () => void;
+  onQueryChange: (value: string) => void;
+  query: string;
 }) {
   return (
     <section className="priority-queue-panel surface-card">
       <div className="panel-heading">
         <div><p className="eyebrow">PRIORITY QUEUE</p><h2>Attention needed</h2><span>Ranked by deadline and dependency</span></div>
-        <button className="text-action" onClick={() => onFilterChange("All")} type="button">View all work <DashboardIcon name="arrow" size={16} /></button>
+        <button className="text-action" onClick={onOpenMyWork} type="button">View all work <DashboardIcon name="arrow" size={16} /></button>
       </div>
-      <div className="segment-control" aria-label="Filter priority work">
+      <div className="workspace-toolbar">
+        <div className="segment-control" aria-label="Filter priority work">
         {filters.map((item) => (
           <button aria-pressed={filter === item} key={item} onClick={() => onFilterChange(item)} type="button">
             {item}{item === "All" && <span>{items.length}</span>}
           </button>
         ))}
+        </div>
+        <label className="client-search"><DashboardIcon name="search" size={17} /><input aria-label="Filter this queue by client, service, or owner" onChange={(event) => onQueryChange(event.target.value)} placeholder="Filter this queue..." type="search" value={query} /></label>
       </div>
       <div className="work-list-head" aria-hidden="true"><span>CLIENT & ASSIGNMENT</span><span>PROGRESS</span><span>OWNER</span><span>DUE DATE</span><span /></div>
       <div className="work-list">
@@ -93,74 +101,13 @@ function PriorityQueue({
             </div>
             <div className="work-row-owner"><InitialsAvatar initials={item.ownerInitials} tone="light" /><strong>{item.owner}</strong></div>
             <div className="work-row-due"><strong>{item.due}</strong><span>{item.dueDetail}</span></div>
-            <button aria-label={`Open ${item.client} work item`} className="row-action icon-button" disabled type="button"><DashboardIcon name="arrow" size={17} /></button>
+            <Link aria-label={`Open ${item.client} work item`} className="row-action icon-button" href={`/work/${item.id}`}><DashboardIcon name="arrow" size={17} /></Link>
           </article>
         ))}
-        {!items.length && <div className="empty-state">No work matches the current filters.</div>}
+        {!items.length && <EmptyState description="Clear the filter or search to see the full delivery queue." icon="work" title="No work matches these filters" />}
       </div>
     </section>
   );
-}
-
-function ComplianceHealth({ data }: { data: DashboardData }) {
-  const healthy = data.metrics.legalEntities - data.metrics.attentionClients;
-  const watch = data.clients.filter((client) => client.risk === "Watch").length;
-  return (
-    <section className="insight-card surface-card">
-      <div className="insight-heading"><div><p className="eyebrow">COMPLIANCE</p><h2 className="insight-title">Health score</h2></div><span>Live</span></div>
-      <div className="health-summary">
-        <div className="health-ring" style={{ background: `conic-gradient(var(--violet) 0 ${data.metrics.averageHealth}%, #ebe9fb ${data.metrics.averageHealth}% 100%)` }}>
-          <span><strong>{data.metrics.averageHealth}</strong><small>/100</small><em>Portfolio</em></span>
-        </div>
-        <div className="health-legend">
-          <span><i className="legend-mint" />Healthy <b>{healthy}</b></span>
-          <span><i className="legend-amber" />Watch <b>{watch}</b></span>
-          <span><i className="legend-red" />Critical <b>{data.metrics.criticalClients}</b></span>
-        </div>
-      </div>
-      <div className="service-health-list">
-        {data.serviceHealth.map((service) => (
-          <div key={service.name}><span>{service.name}</span><ProgressBar label={`${service.name} health`} value={service.value} /><b>{service.value}%</b></div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function DeadlineRadar({ data }: { data: DashboardData }) {
-  return (
-    <section className="insight-card surface-card">
-      <div className="insight-heading"><div><p className="eyebrow">UPCOMING</p><h2 className="insight-title">Deadline radar</h2></div><DashboardIcon name="calendar" size={18} /></div>
-      <div className="deadline-radar-list">
-        {data.deadlines.slice(0, 3).map((deadline) => (
-          <article key={deadline.id}>
-            <time><strong>{deadline.day}</strong><span>{deadline.month}</span></time>
-            <div><strong>{deadline.label}</strong><span>{deadline.summary}</span></div>
-            <StatusBadge tone={deadline.urgent ? "red" : "blue"}>{deadline.relative}</StatusBadge>
-          </article>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function TeamCapacity({ data }: { data: DashboardData }) {
-  const owners = Array.from(new Map(data.work.map((item) => [item.owner, item])).values());
-  return (
-    <section className="insight-card surface-card">
-      <div className="insight-heading"><div><p className="eyebrow">TEAM</p><h2 className="insight-title">Team capacity</h2></div><span>{data.practice.activeTeamMembers} active</span></div>
-      <div className="team-capacity-list">
-        {owners.slice(0, 3).map((owner) => {
-          const assignments = data.work.filter((item) => item.owner === owner.owner).length;
-          return <div key={owner.owner}><InitialsAvatar initials={owner.ownerInitials} tone="light" /><span><strong>{owner.owner}</strong><small>{assignments} active assignment{assignments === 1 ? "" : "s"}</small></span><b>{assignments <= 1 ? "Available" : "Balanced"}</b></div>;
-        })}
-      </div>
-    </section>
-  );
-}
-
-function OverviewInsights({ data }: { data: DashboardData }) {
-  return <aside className="overview-insights"><ComplianceHealth data={data} /><DeadlineRadar data={data} /><TeamCapacity data={data} /></aside>;
 }
 
 export function OverviewWorkspace({
@@ -170,6 +117,9 @@ export function OverviewWorkspace({
   items,
   onFilterChange,
   onOpenMyWork,
+  onQueryChange,
+  query,
+  todos,
 }: {
   active: string;
   data: DashboardData;
@@ -177,6 +127,9 @@ export function OverviewWorkspace({
   items: DashboardWorkItem[];
   onFilterChange: (filter: OverviewFilter) => void;
   onOpenMyWork: () => void;
+  onQueryChange: (value: string) => void;
+  query: string;
+  todos: TodoWorkspaceData;
 }) {
   const title = active === "Overview" ? "Your practice, in command." : active;
   return (
@@ -187,12 +140,10 @@ export function OverviewWorkspace({
         eyebrow={`${data.source === "postgres" ? "LOCAL DATABASE" : "DEMO"} · ${data.titleDate}`}
         title={title}
       />
-      <SummaryRibbon data={data} onOpenMyWork={onOpenMyWork} />
-      <OverviewKpis data={data} filter={filter} onFilterChange={onFilterChange} />
-      <section className="overview-main">
-        <PriorityQueue filter={filter} items={items} onFilterChange={onFilterChange} />
-        <OverviewInsights data={data} />
-      </section>
+      <OverviewKpis data={data} filter={filter} onFilterChange={onFilterChange} onOpenMyWork={onOpenMyWork} />
+      <OverviewAnalytics data={data} />
+      <TodoWidget workspace={todos} />
+      <PriorityQueue filter={filter} items={items} onFilterChange={onFilterChange} onOpenMyWork={onOpenMyWork} onQueryChange={onQueryChange} query={query} />
     </div>
   );
 }

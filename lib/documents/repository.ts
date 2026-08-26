@@ -3,6 +3,7 @@ import { and, inArray, asc, desc, eq } from "drizzle-orm";
 
 import { auditEvents, documentRequests, documents, legalEntities, workItems } from "../../db/schema";
 import type { DashboardDatabase } from "../dashboard/postgres/repository";
+import { clearForRequest } from "../dependencies/repository";
 import { planBulkRequestCancel, type BulkPlan } from "./bulk";
 import type { DocumentRequestInput } from "./validation";
 
@@ -64,6 +65,8 @@ export async function cancelDocumentRequest(database: DashboardDatabase, tenantI
     )).returning({ id: documentRequests.id });
     if (!request) throw new DocumentRepositoryError("request_not_found");
     await transaction.insert(auditEvents).values({ tenantId, actorUserId, resourceType: "document_request", resourceId: requestId, action: "document_request.cancelled" });
+    // Work waiting on a request nobody is chasing any more is not waiting.
+    await clearForRequest(transaction, tenantId, actorUserId, requestId, "The request this waited on was cancelled.");
   });
 }
 
@@ -113,6 +116,7 @@ export async function finalizePendingDocumentUpload(database: DashboardDatabase,
       )).returning({ id: documentRequests.id });
       if (!request) throw new DocumentRepositoryError("request_closed");
       await transaction.insert(auditEvents).values({ tenantId, actorUserId, resourceType: "document_request", resourceId: document.requestId, action: "document_request.received", reason: document.originalName });
+      await clearForRequest(transaction, tenantId, actorUserId, document.requestId, document.originalName);
     }
     await transaction.insert(auditEvents).values({ tenantId, actorUserId, resourceType: "document", resourceId: document.id, action: "document.uploaded", reason: document.originalName });
   });
@@ -144,6 +148,7 @@ export async function recordDocumentUpload(database: DashboardDatabase, tenantId
     await transaction.insert(auditEvents).values({ tenantId, actorUserId, resourceType: "document", resourceId: id, action: "document.uploaded", reason: input.originalName });
     if (input.requestId) {
       await transaction.insert(auditEvents).values({ tenantId, actorUserId, resourceType: "document_request", resourceId: input.requestId, action: "document_request.received", reason: input.originalName });
+      await clearForRequest(transaction, tenantId, actorUserId, input.requestId, input.originalName);
     }
     return id;
   });
@@ -211,6 +216,7 @@ export async function applyBulkRequestCancel(
         action: "document_request.cancelled",
         reason: "Cancelled from a Documents bulk action",
       });
+      await clearForRequest(transaction, tenantId, actorUserId, item.id, "The request this waited on was cancelled.");
     }
     return plan;
   });

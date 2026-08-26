@@ -56,6 +56,7 @@ export default function WorkDialog({
       {data && (
         <WorkForm
           action={saveWorkAction}
+          capability={data.capability}
           clients={data.clients}
           initial={initial ?? { internalDueDate: data.defaults.internalDueDate, legalEntityId: prefilled, statutoryDueDate: data.defaults.statutoryDueDate }}
           members={data.members}

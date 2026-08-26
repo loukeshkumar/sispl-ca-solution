@@ -1,9 +1,62 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useCallback, useEffect, useState } from "react";
 
 import { emptyRegisterBulkState } from "../../lib/registers/bulk";
 import { applyBulkDscAction, applyBulkNoticeAction } from "../registers/bulk-actions";
+
+/**
+ * Select-all for the rows currently on screen, plus a live count.
+ *
+ * Rows sit inside urgency groups and belong to the bulk form through the
+ * `form` attribute rather than by nesting, so the checkboxes are found by that
+ * association. Only the visible page is ever selected: a control that silently
+ * reached rows the reader could not see would make a bulk change unreviewable.
+ */
+export function RegisterSelection({ formId, name }: { formId: string; name: string }) {
+  const [selected, setSelected] = useState(0);
+  const [total, setTotal] = useState(0);
+
+  const boxes = useCallback(
+    () => [...document.querySelectorAll<HTMLInputElement>(`input[type="checkbox"][form="${formId}"][name="${name}"]`)],
+    [formId, name],
+  );
+
+  useEffect(() => {
+    const sync = () => {
+      const all = boxes();
+      setTotal(all.length);
+      setSelected(all.filter((box) => box.checked).length);
+    };
+    sync();
+    document.addEventListener("change", sync);
+    return () => document.removeEventListener("change", sync);
+  }, [boxes]);
+
+  const toggle = (checked: boolean) => {
+    const all = boxes();
+    for (const box of all) box.checked = checked;
+    setSelected(checked ? all.length : 0);
+  };
+
+  if (total === 0) return null;
+  return (
+    <div className="register-selection-bar">
+      <label>
+        <input
+          aria-label={`Select all ${total} rows on this page`}
+          checked={selected > 0 && selected === total}
+          onChange={(event) => toggle(event.target.checked)}
+          // Some but not all selected reads as neither on nor off.
+          ref={(node) => { if (node) node.indeterminate = selected > 0 && selected < total; }}
+          type="checkbox"
+        />
+        <span>Select all on this page</span>
+      </label>
+      <span aria-live="polite">{selected === 0 ? `${total} rows` : `${selected} of ${total} selected`}</span>
+    </div>
+  );
+}
 
 /** Matches the shape register form options already provide. */
 type Member = { id: string; name: string };

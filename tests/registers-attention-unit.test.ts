@@ -110,7 +110,7 @@ test("register parameters round-trip, default to the action queue, and reject no
   const params = parseRegisterParams({ q: "ROC", status: "in_progress", tab: "notices" });
   assert.deepEqual(parseRegisterParams(Object.fromEntries(new URL(`http://x${registerHref(params)}`).searchParams)), params);
   assert.deepEqual(parseRegisterParams({ status: "vibes", tab: "ledger" }), DEFAULT_REGISTER_PARAMS);
-  assert.deepEqual(REGISTER_TABS.map((tab) => tab.key), ["attention", "notices", "dsc", "udin"]);
+  assert.deepEqual(REGISTER_TABS.map((tab) => tab.key), ["attention", "notices", "dsc", "udin", "insights"]);
 });
 
 const noticeCandidate = (over: Partial<NoticeBulkCandidate> = {}): NoticeBulkCandidate => ({

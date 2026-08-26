@@ -128,7 +128,7 @@ Expected: FAIL with missing `lib/packages/validation.ts` exports.
 
 - [ ] **Step 3: Implement service validation minimally**
 
-Accept codes matching `^[A-Z][A-Z0-9_-]{1,19}$`, names from 2–100 characters, categories from 2–60 characters, descriptions up to 500 characters, and statuses `active|archived`.
+Accept codes matching `^[A-Z0-9][A-Z0-9_-]{1,19}$` (including statutory forms such as `10B`), names from 2–100 characters, categories from 2–60 characters, descriptions up to 500 characters, and statuses `active|archived`.
 
 - [ ] **Step 4: Write failing package and assignment tests**
 

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 
 import { requirePermission } from "../../lib/auth/server";
 import { getDatabase } from "../../lib/dashboard/postgres/pool";
+import { listCapabilityIndex, type CapabilityIndex } from "../../lib/team/capability-repository";
 import { completeWorkItem, createWorkItem, listWorkClients, listWorkMembers, updateWorkItem, WorkRepositoryError } from "../../lib/work/repository";
 import { validateWorkFields, type WorkActionState, type WorkFormFields } from "../../lib/work/validation";
 
@@ -17,7 +18,6 @@ function workFields(formData: FormData): WorkFormFields {
     "budgetMinutes",
     "internalDueDate",
     "legalEntityId",
-    "missingItemCount",
     "periodKey",
     "progress",
     "reviewerId",
@@ -36,6 +36,8 @@ function writeError(error: unknown): WorkActionState {
 }
 
 export type WorkFormOptions = {
+  /** Who is trusted with what, so the picker can say so before anyone saves. */
+  capability: CapabilityIndex;
   clients: Awaited<ReturnType<typeof listWorkClients>>;
   defaults: { internalDueDate: string; statutoryDueDate: string };
   todayKey: string;
@@ -54,11 +56,12 @@ function dateOffset(days: number) {
 export async function loadWorkFormOptions(): Promise<WorkFormOptions> {
   const session = await requirePermission("work:write", "/?workspace=work");
   const database = getDatabase();
-  const [clients, members] = await Promise.all([
+  const [clients, members, capability] = await Promise.all([
     listWorkClients(database, session.tenantId),
     listWorkMembers(database, session.tenantId),
+    listCapabilityIndex(database, session.tenantId),
   ]);
-  return { clients, defaults: { internalDueDate: dateOffset(5), statutoryDueDate: dateOffset(7) }, members, todayKey: dateOffset(0) };
+  return { capability, clients, defaults: { internalDueDate: dateOffset(5), statutoryDueDate: dateOffset(7) }, members, todayKey: dateOffset(0) };
 }
 
 /**

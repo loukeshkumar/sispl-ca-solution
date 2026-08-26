@@ -8,7 +8,6 @@ const validFields = {
   blockerNote: "Invoices awaited from client",
   internalDueDate: "2026-08-18",
   legalEntityId: "40000000-0000-4000-8000-000000000001",
-  missingItemCount: "3",
   periodKey: "August 2026",
   progress: "45",
   reviewerId: "20000000-0000-4000-8000-000000000003",
@@ -22,15 +21,17 @@ test("work validation produces a normalized open workflow model", () => {
   assert.equal(result.success, true);
   if (!result.success) return;
   assert.equal(result.data.progress, 45);
-  assert.equal(result.data.missingItemCount, 3);
   assert.equal(result.data.status, "waiting");
 });
 
-test("waiting work requires a dependency explanation", () => {
+test("waiting is no longer justified by a sentence in the form", () => {
+  // The note used to be the whole record of what was awaited. Whether work may
+  // sit in Waiting now depends on the dependencies recorded against it, which a
+  // form cannot see, so the repository refuses it instead.
   const result = validateWorkFields({ ...validFields, blockerNote: "" });
-  assert.equal(result.success, false);
-  if (result.success) return;
-  assert.match(result.fieldErrors.blockerNote ?? "", /Explain what is awaited/);
+  assert.equal(result.success, true);
+  if (!result.success) return;
+  assert.equal(result.data.status, "waiting");
 });
 
 test("work validation enforces deadline order and separation of duties", () => {

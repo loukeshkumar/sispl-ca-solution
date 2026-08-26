@@ -1,3 +1,6 @@
+import type { ClientScheduleOverride, ComplianceExtension } from "./client-schedules";
+import { extendedDueDate, resolveSchedule } from "./client-schedules";
+
 export type ComplianceFrequency = "monthly" | "quarterly" | "annual";
 
 export type ComplianceScheduleRule = {
@@ -19,8 +22,12 @@ export type RecurringWorkDraft = {
   periodKey: string;
   statutoryDueDate: string;
   internalDueDate: string;
-  status: "waiting";
+  status: "at_risk";
   blockerNote: string;
+  /** Where the governing rule came from, so a queue can say why a date is what it is. */
+  source: "firm" | "client";
+  /** The date before an extension moved it, or null where nothing moved. */
+  originalStatutoryDueDate: string | null;
 };
 
 const MONTH_LABELS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -90,6 +97,10 @@ function candidatePeriodEnds(frequency: ComplianceFrequency, todayKey: string): 
 export function buildRecurringWorkDrafts(input: {
   schedules: ComplianceScheduleRule[];
   entitlements: EntitledService[];
+  /** Standing departures from the firm calendar, by client and service. */
+  overrides?: ClientScheduleOverride[];
+  /** Dates moved by an authority for one period. */
+  extensions?: ComplianceExtension[];
   todayKey: string;
   lookaheadDays?: number;
   /**
@@ -104,35 +115,67 @@ export function buildRecurringWorkDrafts(input: {
   const lookahead = input.lookaheadDays ?? DEFAULT_LOOKAHEAD_DAYS;
   const horizonKey = addDaysToDateKey(input.todayKey, lookahead);
   const fromKey = input.fromKey ?? input.todayKey;
-  const entitlementsByCode = new Map<string, string[]>();
+  const overrides = input.overrides ?? [];
+  const extensions = input.extensions ?? [];
+
+  // Iterated per engagement rather than per schedule: the rule that governs a
+  // period is now the client's, and the frequency it carries decides which
+  // periods exist at all. Grouping by service first would settle that before
+  // knowing whose calendar it is.
+  const pairs = new Map<string, { legalEntityId: string; serviceCode: string }>();
   for (const entitlement of input.entitlements) {
-    const code = entitlement.serviceCode.toUpperCase();
-    entitlementsByCode.set(code, [...(entitlementsByCode.get(code) ?? []), entitlement.legalEntityId]);
+    const serviceCode = entitlement.serviceCode.toUpperCase();
+    pairs.set(`${entitlement.legalEntityId}:${serviceCode}`, { legalEntityId: entitlement.legalEntityId, serviceCode });
   }
+
   const drafts: RecurringWorkDraft[] = [];
   const seen = new Set<string>();
-  for (const schedule of input.schedules) {
-    const entityIds = entitlementsByCode.get(schedule.serviceCode.toUpperCase()) ?? [];
-    if (entityIds.length === 0) continue;
-    for (const periodEnd of candidatePeriodEnds(schedule.frequency, input.todayKey)) {
-      const statutoryDueDate = addMonthsClamped(periodEnd, schedule.dueMonthOffset, schedule.dueDay);
-      if (statutoryDueDate < fromKey || statutoryDueDate > horizonKey) continue;
-      const key = periodLabel(schedule.frequency, periodEnd);
-      const internalDueDate = addDaysToDateKey(statutoryDueDate, -schedule.internalLeadDays);
-      for (const legalEntityId of entityIds) {
-        const dedupe = `${legalEntityId}:${schedule.serviceCode.toUpperCase()}:${key}`;
-        if (seen.has(dedupe)) continue;
-        seen.add(dedupe);
-        drafts.push({
-          legalEntityId,
-          serviceKey: schedule.serviceCode.toUpperCase(),
-          periodKey: key,
-          statutoryDueDate,
-          internalDueDate: internalDueDate < statutoryDueDate ? internalDueDate : statutoryDueDate,
-          status: "waiting",
-          blockerNote: "Awaiting client information for this period.",
-        });
-      }
+  for (const { legalEntityId, serviceCode } of pairs.values()) {
+    const resolved = resolveSchedule({
+      asOfKey: input.todayKey,
+      firmRules: input.schedules,
+      legalEntityId,
+      overrides,
+      serviceCode,
+    });
+    // Exempt clients and services the firm has written no schedule for both
+    // raise nothing, which is the whole point of saying so.
+    if (!resolved.rule) continue;
+    const rule = resolved.rule;
+
+    for (const periodEnd of candidatePeriodEnds(rule.frequency, input.todayKey)) {
+      const scheduled = addMonthsClamped(periodEnd, rule.dueMonthOffset, rule.dueDay);
+      const periodKey = periodLabel(rule.frequency, periodEnd);
+      const moved = extendedDueDate({
+        extensions,
+        legalEntityId,
+        periodKey,
+        serviceCode,
+        statutoryDueDate: scheduled,
+      });
+      // Filtered on the date that actually applies: an extension is precisely
+      // what brings a period back inside the window it had fallen out of.
+      if (moved.dueDate < fromKey || moved.dueDate > horizonKey) continue;
+
+      const dedupe = `${legalEntityId}:${serviceCode}:${periodKey}`;
+      if (seen.has(dedupe)) continue;
+      seen.add(dedupe);
+
+      const internalDueDate = addDaysToDateKey(moved.dueDate, -rule.internalLeadDays);
+      drafts.push({
+        legalEntityId,
+        serviceKey: serviceCode,
+        periodKey,
+        statutoryDueDate: moved.dueDate,
+        internalDueDate: internalDueDate < moved.dueDate ? internalDueDate : moved.dueDate,
+        // Not `waiting`: nothing has been recorded that this waits on, and a
+        // status claiming an unnameable wait is the thing dependencies exist
+        // to replace. It becomes `waiting` when somebody records what for.
+        status: "at_risk",
+        blockerNote: "Raised from the recurring compliance calendar.",
+        source: resolved.source === "client" ? "client" : "firm",
+        originalStatutoryDueDate: moved.extended ? scheduled : null,
+      });
     }
   }
   return drafts;

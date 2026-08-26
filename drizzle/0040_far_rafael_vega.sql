@@ -1,0 +1,2 @@
+ALTER TABLE "notifications" DROP CONSTRAINT "notifications_type_check";--> statement-breakpoint
+ALTER TABLE "notifications" ADD CONSTRAINT "notifications_type_check" CHECK ("notifications"."type" in ('work_item_due', 'work_item_overdue', 'document_request_overdue', 'task_assigned', 'attendance_request_raised', 'attendance_request_decided', 'payslip_published', 'invoice_overdue', 'dsc_expiring', 'notice_due'));

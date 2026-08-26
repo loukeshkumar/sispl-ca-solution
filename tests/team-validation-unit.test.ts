@@ -25,6 +25,11 @@ test("employee validation normalizes a safe tenant member profile", () => {
     mobileNumber: "+919876543210",
     notes: "GST and audit team",
     roleDefinitionId: "26000000-0000-4000-8000-000000000003",
+    // Standing defaults to the honest answer for somebody it was not stated for:
+    // no claimed qualification, and therefore no membership number.
+    qualification: "other",
+    membershipNumber: "",
+    qualifiedOn: null,
   });
 });
 

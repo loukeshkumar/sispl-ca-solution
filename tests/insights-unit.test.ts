@@ -8,9 +8,10 @@ import {
   detectReceivablesAgeing,
   detectRegisterRisk,
   detectUnassignedWork,
-  detectUtilisationOutliers,
+  detectUtilisationGap,
   type SignalInputs,
 } from "../lib/insights/signals";
+import { summariseFirm, type PersonUtilisation } from "../lib/rates/utilisation";
 
 const TODAY = "2026-08-17";
 
@@ -97,18 +98,52 @@ test("client risk names the lowest-scoring relationship", () => {
   assert.match(signals[0].evidence, /Koshi Infra at 28\/100/);
 });
 
-test("utilisation outliers need a real team and a non-zero median", () => {
-  const entry = (id: string, name: string, minutes: number) => ({ employeeUserId: id, employeeName: name, minutes, billable: true });
-  assert.deepEqual(detectUtilisationOutliers({ ...empty, timeEntries: [entry("a", "A", 600), entry("b", "B", 60)] }), [], "two people is not a distribution");
-  assert.deepEqual(detectUtilisationOutliers({ ...empty, timeEntries: [entry("a", "A", 0), entry("b", "B", 0), entry("c", "C", 0)] }), []);
+const person = (over: Partial<PersonUtilisation> = {}): PersonUtilisation => ({
+  availableMinutes: 9_000, band: "on_target", chargeableMinutes: 7_200,
+  employeeUserId: "a", fullName: "Asha", leaveMinutes: 0, missingMinutes: 0,
+  recordedMinutes: 9_000, recordingBps: 10_000, roleKey: "associate",
+  scheduledMinutes: 9_000, targetBasisPoints: 8_000, targetSource: "role",
+  utilisationBps: 8_000, varianceBps: 0,
+  ...over,
+});
 
-  const signals = detectUtilisationOutliers({
-    ...empty,
-    timeEntries: [entry("a", "Asha", 6_000), entry("b", "Bhavna", 600), entry("c", "Chetan", 620)],
-  });
-  assert.equal(signals.length, 1);
-  assert.match(signals[0].evidence, /Asha/);
-  assert.match(signals[0].evidence, /above/);
+test("a team that all under-records is caught, which the median never could", () => {
+  // The old measure compared people to each other, so a firm where everybody
+  // recorded half their month had a perfectly healthy median and said nothing.
+  const utilisation = summariseFirm([
+    person({ employeeUserId: "a", fullName: "Asha", recordedMinutes: 4_000, missingMinutes: 5_000 }),
+    person({ employeeUserId: "b", fullName: "Bhavna", recordedMinutes: 4_200, missingMinutes: 4_800 }),
+    person({ employeeUserId: "c", fullName: "Chetan", recordedMinutes: 4_100, missingMinutes: 4_900 }),
+  ]);
+  const signals = detectUtilisationGap({ ...empty, utilisation });
+  const unrecorded = signals.find((signal) => signal.id === "utilisation-unrecorded");
+  assert.ok(unrecorded, "three people missing half their month is the finding");
+  assert.equal(unrecorded.severity, "warning");
+  assert.match(unrecorded.evidence, /Asha/);
+});
+
+test("being below target is reported against the target, not against colleagues", () => {
+  const utilisation = summariseFirm([
+    person({ employeeUserId: "a", fullName: "Asha", band: "under", utilisationBps: 5_000, varianceBps: -3_000, chargeableMinutes: 4_500 }),
+    person({ employeeUserId: "b", fullName: "Bhavna" }),
+  ]);
+  const signals = detectUtilisationGap({ ...empty, utilisation });
+  const below = signals.find((signal) => signal.id === "utilisation-below-target");
+  assert.ok(below);
+  assert.match(below.evidence, /Asha at 50\.0% against a target of 80\.0%/);
+});
+
+test("nobody being measured is itself the finding", () => {
+  const utilisation = summariseFirm([
+    person({ band: "unmeasured", targetBasisPoints: null, targetSource: "none", varianceBps: null }),
+  ]);
+  const signals = detectUtilisationGap({ ...empty, utilisation });
+  assert.ok(signals.some((signal) => signal.id === "utilisation-no-target"));
+});
+
+test("a firm with no measurement at all stays quiet rather than guessing", () => {
+  assert.deepEqual(detectUtilisationGap({ ...empty, utilisation: null }), []);
+  assert.deepEqual(detectUtilisationGap({ ...empty, utilisation: summariseFirm([]) }), []);
 });
 
 test("expired certificates and lapsed notices are both critical register signals", () => {

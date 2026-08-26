@@ -16,6 +16,7 @@ export const demoDashboardRecords: DashboardRecords = {
     { id: "20000000-0000-4000-8000-000000000003", fullName: "Rahul K.", roleKey: "manager", status: "active" },
     { id: "20000000-0000-4000-8000-000000000004", fullName: "Priya M.", roleKey: "partner", status: "active" },
     { id: "20000000-0000-4000-8000-000000000005", fullName: "Vikram R.", roleKey: "associate", status: "active" },
+    { id: "20000000-0000-4000-8000-000000000006", fullName: "Ayesha K.", roleKey: "associate", status: "active" },
   ],
   clients: [
     {
@@ -53,17 +54,19 @@ export const demoDashboardRecords: DashboardRecords = {
     {
       id: "60000000-0000-4000-8000-000000000001", legalEntityId: "40000000-0000-4000-8000-000000000002",
       clientName: "Koshi Infra LLP", serviceKey: "tds_26q", periodKey: "Q1 · FY 26–27", ownerName: "Rahul K.",
-      dueDate: "2026-08-12", status: "critical", blockerNote: "Challan allocation incomplete", progress: 64, missingItems: 4,
+      dueDate: "2026-08-12", status: "critical", blockerNote: "Challan allocation incomplete", progress: 64, missingItems: 0,
     },
     {
       id: "60000000-0000-4000-8000-000000000002", legalEntityId: "40000000-0000-4000-8000-000000000001",
       clientName: "Aarav Retail Pvt. Ltd.", serviceKey: "gstr_3b", periodKey: "July 2026", ownerName: "Nisha S.",
-      dueDate: "2026-08-15", status: "at_risk", blockerNote: "18 invoices need reconciliation", progress: 78, missingItems: 18,
+      dueDate: "2026-08-15", status: "at_risk", blockerNote: "18 invoices need reconciliation", progress: 78, missingItems: 0,
     },
     {
       id: "60000000-0000-4000-8000-000000000003", legalEntityId: "40000000-0000-4000-8000-000000000005",
       clientName: "Neelam Foods", serviceKey: "monthly_close", periodKey: "July 2026", ownerName: "Vikram R.",
-      dueDate: "2026-08-16", status: "waiting", blockerNote: "Bank statement awaited", progress: 46, missingItems: 2,
+      // Waits on a recorded dependency the seed raises below, so the fixture
+      // demonstrates the model rather than the sentence it replaced.
+      dueDate: "2026-08-16", status: "waiting", blockerNote: "Ramesh sends these on Fridays", progress: 46, missingItems: 1,
     },
     {
       id: "60000000-0000-4000-8000-000000000004", legalEntityId: "40000000-0000-4000-8000-000000000003",

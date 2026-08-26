@@ -31,3 +31,13 @@ export async function getPostgresDashboardData(
   const records = await dependencies.loadDashboardRecords(database, tenantId);
   return mapDashboardRecords(records, now, "postgres");
 }
+
+export async function getPostgresDashboardDataForTenant(
+  tenantId: string,
+  now?: Date,
+  dependencies: Pick<ProviderDependencies, "getDatabase" | "loadDashboardRecords"> = defaultDependencies,
+): Promise<DashboardData> {
+  if (!tenantId.trim()) throw new Error("tenantId is required.");
+  const records = await dependencies.loadDashboardRecords(dependencies.getDatabase(), tenantId);
+  return mapDashboardRecords(records, now, "postgres");
+}

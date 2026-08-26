@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 import {
@@ -6,6 +6,7 @@ import {
   clientServices,
   legalEntities,
   registrations,
+  serviceCatalog,
   tenantMemberships,
   tenants,
   users,
@@ -81,6 +82,7 @@ export async function loadDashboardRecords(
       legalEntityId: workItems.legalEntityId,
       clientName: legalEntities.displayName,
       serviceKey: workItems.serviceKey,
+      serviceName: serviceCatalog.name,
       periodKey: workItems.periodKey,
       ownerName: users.fullName,
       dueDate: workItems.statutoryDueDate,
@@ -90,8 +92,9 @@ export async function loadDashboardRecords(
       missingItems: workItems.missingItemCount,
     }).from(workItems)
       .innerJoin(legalEntities, and(eq(legalEntities.id, workItems.legalEntityId), eq(legalEntities.tenantId, tenantId)))
+      .leftJoin(serviceCatalog, and(eq(serviceCatalog.tenantId, tenantId), sql`lower(${serviceCatalog.code}) = lower(${workItems.serviceKey})`))
       .leftJoin(users, eq(users.id, workItems.assigneeId))
-      .where(eq(workItems.tenantId, tenantId))
+      .where(and(eq(workItems.tenantId, tenantId), eq(legalEntities.status, "active")))
       .orderBy(asc(workItems.statutoryDueDate)),
   ]);
 

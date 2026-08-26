@@ -3,6 +3,8 @@
 import { useActionState, useMemo, useState } from "react";
 
 import { useCloseOnSuccess } from "../dashboard/form-dialog";
+import { assessAssignee, assessReviewer, CAPABILITY_LABELS, meets, rankMembers } from "../../lib/team/capability";
+import type { CapabilityIndex } from "../../lib/team/capability-repository";
 import type { WorkClientOption, WorkMemberOption } from "../../lib/work/repository";
 import {
   bufferState,
@@ -12,6 +14,7 @@ import {
   workStatusTone,
 } from "../../lib/work/form-helpers";
 import {
+  workServiceEntitlementCode,
   workServiceLabel,
   workStatusOptions,
   type WorkActionState,
@@ -37,6 +40,7 @@ function MemberChip({ member }: { member?: WorkMemberOption }) {
 
 export default function WorkForm({
   action,
+  capability,
   clients,
   initial,
   members,
@@ -47,6 +51,7 @@ export default function WorkForm({
   workItemId,
 }: {
   action: WorkFormAction;
+  capability: CapabilityIndex;
   clients: WorkClientOption[];
   initial?: Partial<WorkInput>;
   members: WorkMemberOption[];
@@ -66,6 +71,8 @@ export default function WorkForm({
   const [budget, setBudget] = useState(initial?.budgetMinutes ? String(initial.budgetMinutes) : "");
   const [assigneeId, setAssigneeId] = useState(initial?.assigneeId ?? "");
   const [reviewerId, setReviewerId] = useState(initial?.reviewerId ?? "");
+  const [serviceChoice, setServiceChoice] = useState(initial?.serviceKey ?? "");
+  const [serviceClient, setServiceClient] = useState(clientId);
   useCloseOnSuccess(pending, state, onSaved);
 
   const selectedClient = clients.find((client) => client.id === clientId);
@@ -73,6 +80,34 @@ export default function WorkForm({
   if (initial?.serviceKey && !availableServices.some((service) => service.key === initial.serviceKey)) {
     availableServices.unshift({ key: initial.serviceKey, label: `${workServiceLabel(initial.serviceKey)} (existing work)` });
   }
+  // Changing the client changes which services are on offer, so the previous
+  // choice is no longer meaningful. Adjusting during render is React's own
+  // answer to "derive state from a prop change" and avoids a second pass.
+  if (serviceClient !== clientId) {
+    setServiceClient(clientId);
+    setServiceChoice("");
+  }
+  const serviceKey = serviceChoice || availableServices[0]?.key || "";
+  const serviceLabel = availableServices.find((service) => service.key === serviceKey)?.label
+    ?? (serviceKey ? workServiceLabel(serviceKey) : "this service");
+
+  // Capability is held against the service master's codes; a work item's service
+  // resolves to one, which is what makes "who can do this" a lookup.
+  const serviceCode = serviceKey ? workServiceEntitlementCode(serviceKey) : "";
+  const levelById = new Map(
+    capability.levels.filter((row) => row.serviceCode === serviceCode).map((row) => [row.memberId, row.level]),
+  );
+  const governed = capability.governed.includes(serviceCode);
+  const recordsFor = (memberId: string) => {
+    const level = levelById.get(memberId);
+    return level ? [{ level, serviceCode }] : [];
+  };
+  const assigneeVerdict = assigneeId ? assessAssignee(recordsFor(assigneeId), serviceCode, serviceLabel) : null;
+  const reviewerVerdict = reviewerId ? assessReviewer(recordsFor(reviewerId), serviceCode, serviceLabel, governed) : null;
+  const rankedMembers = rankMembers(members, levelById);
+  const reviewerOptions = governed
+    ? rankedMembers.filter((member) => meets(member.level, "review") || member.id === reviewerId)
+    : rankedMembers;
   const emptyServiceMessage = servicePlaceholder(Boolean(clientId), availableServices.length);
   const buffer = bufferState(statutoryDueDate, internalDueDate);
   const presets = useMemo(() => periodPresets(todayKey), [todayKey]);
@@ -86,7 +121,7 @@ export default function WorkForm({
     : {};
 
   const summary = [
-    availableServices.find((service) => service.key === (initial?.serviceKey ?? availableServices[0]?.key))?.label,
+    serviceLabel,
     selectedClient?.displayName,
     period,
   ].filter(Boolean).join(" · ");
@@ -115,10 +150,10 @@ export default function WorkForm({
             <span>Service / form</span>
             <select
               {...fieldA11y("serviceKey")}
-              defaultValue={initial?.serviceKey ?? availableServices[0]?.key ?? ""}
-              key={clientId}
               name="serviceKey"
+              onChange={(event) => setServiceChoice(event.target.value)}
               required
+              value={serviceKey}
             >
               {availableServices.length
                 ? availableServices.map((service) => <option key={service.key} value={service.key}>{service.label}</option>)
@@ -178,16 +213,32 @@ export default function WorkForm({
             <span>Assignee <MemberChip member={assignee} /></span>
             <select {...fieldA11y("assigneeId")} name="assigneeId" onChange={(event) => setAssigneeId(event.target.value)} value={assigneeId}>
               <option value="">Unassigned</option>
-              {members.map((member) => <option key={member.id} value={member.id}>{member.fullName}</option>)}
+              {rankedMembers.map((member) => (
+                <option key={member.id} value={member.id}>
+                  {member.level ? `${member.fullName} · ${CAPABILITY_LABELS[member.level]}` : `${member.fullName} · not rated`}
+                </option>
+              ))}
             </select>
+            {/* Stretch work is allowed on purpose — this says so rather than
+                refusing, and the save records it against the item. */}
+            {assigneeVerdict?.stretch && <small className="work-form-hint is-stretch">{assigneeVerdict.message}</small>}
             <FieldError field="assigneeId" message={state.fieldErrors.assigneeId} />
           </label>
           <label>
             <span>Reviewer <MemberChip member={reviewer} /></span>
             <select {...fieldA11y("reviewerId")} name="reviewerId" onChange={(event) => setReviewerId(event.target.value)} value={reviewerId}>
               <option value="">Not assigned</option>
-              {members.map((member) => <option key={member.id} value={member.id}>{member.fullName}</option>)}
+              {reviewerOptions.map((member) => (
+                <option key={member.id} value={member.id}>
+                  {member.level ? `${member.fullName} · ${CAPABILITY_LABELS[member.level]}` : `${member.fullName} · not rated`}
+                </option>
+              ))}
             </select>
+            {reviewerVerdict?.blocked
+              ? <small className="work-form-hint is-blocked">{reviewerVerdict.message}</small>
+              : !governed && serviceCode
+                ? <small className="work-form-hint">Nobody is recorded as able to review {serviceLabel} yet, so any reviewer is accepted.</small>
+                : null}
             <FieldError field="reviewerId" message={state.fieldErrors.reviewerId} />
           </label>
         </div>
@@ -222,12 +273,6 @@ export default function WorkForm({
             {/* Capped at 99: open work cannot claim completion from this form. */}
             <span className="work-progress-meter"><i style={{ width: `${progressValue}%` }} /></span>
             <FieldError field="progress" message={state.fieldErrors.progress} />
-          </label>
-
-          <label>
-            <span>Missing items</span>
-            <input {...fieldA11y("missingItemCount")} defaultValue={initial?.missingItemCount ?? 0} max={999} min={0} name="missingItemCount" required type="number" />
-            <FieldError field="missingItemCount" message={state.fieldErrors.missingItemCount} />
           </label>
 
           <label>

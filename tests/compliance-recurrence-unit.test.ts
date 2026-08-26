@@ -26,7 +26,9 @@ test("a monthly schedule generates the periods whose statutory due dates fall in
     ["August 2026", "2026-09-20", "2026-09-17"],
   ]);
   assert.equal(drafts[0].serviceKey, "GST");
-  assert.equal(drafts[0].status, "waiting");
+  // Not `waiting`: generated work waits on nothing that has been recorded, and
+  // `waiting` now means at least one named, chaseable thing is outstanding.
+  assert.equal(drafts[0].status, "at_risk");
   assert.ok(drafts[0].blockerNote.length >= 3);
 });
 

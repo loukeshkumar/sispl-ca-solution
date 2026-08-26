@@ -1,6 +1,6 @@
 export type DataSource = "demo" | "postgres";
 export type RiskStatus = "Healthy" | "Watch" | "Critical";
-export type WorkStatus = "Critical" | "At risk" | "Waiting" | "Review";
+export type WorkStatus = "Critical" | "At risk" | "Waiting" | "Review" | "Completed";
 
 export type DashboardRecords = {
   tenant: {
@@ -35,10 +35,11 @@ export type DashboardRecords = {
     legalEntityId: string;
     clientName: string;
     serviceKey: string;
+    serviceName?: string | null;
     periodKey: string;
     ownerName: string;
     dueDate: string;
-    status: "critical" | "at_risk" | "waiting" | "review";
+    status: "critical" | "at_risk" | "waiting" | "review" | "completed";
     blockerNote: string;
     progress: number;
     missingItems: number;
@@ -83,6 +84,7 @@ export type DashboardWorkItem = {
 export type DashboardData = {
   source: DataSource;
   generatedAt: string;
+  todayKey: string;
   titleDate: string;
   practice: {
     name: string;

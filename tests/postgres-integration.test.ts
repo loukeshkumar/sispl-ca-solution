@@ -433,6 +433,7 @@ test("Super Admin governs delegated Admin roles and permission changes revoke ac
     const created = await createEmployee(database, identity.tenantId, identity.userId, {
       designation: "People Administrator", email: `people-admin-${suffix}@example.invalid`, fullName: `People Admin ${suffix}`,
       joiningDate: "2026-08-17", mobileNumber: "", notes: "Delegated Admin", roleDefinitionId: roleId,
+      qualification: "other" as const, membershipNumber: "", qualifiedOn: null,
     });
     employeeId = created.employeeId;
     adminUserId = created.userId;
@@ -495,6 +496,9 @@ test("employee lifecycle is tenant-scoped, provisions one-time access, and guard
   const suffix = randomUUID().slice(0, 8);
   const created = await createEmployee(database, identity.tenantId, identity.userId, {
     designation: "Audit Associate",
+    qualification: "other" as const,
+    membershipNumber: "",
+    qualifiedOn: null,
     email: `employee-${suffix}@example.invalid`,
     fullName: `Employee ${suffix}`,
     joiningDate: "2026-08-16",
@@ -585,6 +589,9 @@ test("employee disabling and task assignment serialize on the membership boundar
   const suffix = randomUUID().slice(0, 8);
   const created = await createEmployee(database, identity.tenantId, identity.userId, {
     designation: "Concurrency Associate",
+    qualification: "other" as const,
+    membershipNumber: "",
+    qualifiedOn: null,
     email: `concurrency-${suffix}@example.invalid`,
     fullName: `Concurrency ${suffix}`,
     joiningDate: "2026-08-16",
@@ -644,6 +651,9 @@ test("tenant employee administration cannot mutate a shared multi-firm identity"
   const suffix = randomUUID().slice(0, 8);
   const created = await createEmployee(database, identity.tenantId, identity.userId, {
     designation: "Shared Associate",
+    qualification: "other" as const,
+    membershipNumber: "",
+    qualifiedOn: null,
     email: `shared-${suffix}@example.invalid`,
     fullName: `Shared ${suffix}`,
     joiningDate: "2026-08-16",
@@ -656,7 +666,7 @@ test("tenant employee administration cannot mutate a shared multi-firm identity"
   await database.insert(tenants).values({ id: secondTenantId, legalName: `Second firm ${suffix}`, displayName: `Second firm ${suffix}`, slug: `second-${suffix}` });
   await database.insert(tenantMemberships).values({ id: secondMembershipId, tenantId: secondTenantId, userId: created.userId, roleKey: "associate", status: "active" });
   try {
-    const input = { designation: "Changed", email: `shared-${suffix}@example.invalid`, fullName: `Changed ${suffix}`, joiningDate: "2026-08-16", mobileNumber: "", notes: "", roleKey: "associate" as const };
+    const input = { designation: "Changed", email: `shared-${suffix}@example.invalid`, fullName: `Changed ${suffix}`, joiningDate: "2026-08-16", mobileNumber: "", notes: "", qualification: "other" as const, membershipNumber: "", qualifiedOn: null, roleKey: "associate" as const };
     await assert.rejects(() => updateEmployee(database, identity.tenantId, identity.userId, created.employeeId, input), (error: unknown) => error instanceof TeamRepositoryError && error.code === "shared_identity");
     await assert.rejects(() => provisionEmployeeAccess(database, identity.tenantId, identity.userId, created.employeeId), (error: unknown) => error instanceof TeamRepositoryError && error.code === "shared_identity");
   } finally {
@@ -870,7 +880,6 @@ test("client lifecycle is tenant-scoped, audited, and archived without destructi
       blockerNote: "",
       internalDueDate: "2026-08-30",
       legalEntityId: clientId,
-      missingItemCount: 0,
       periodKey: `Archive guard ${suffix}`,
       progress: 10,
       reviewerId: null,
@@ -921,7 +930,6 @@ test("compliance work lifecycle is tenant-scoped, audited, and completed outside
     blockerNote: "",
     internalDueDate: "2026-08-19",
     legalEntityId: "40000000-0000-4000-8000-000000000001",
-    missingItemCount: 0,
     periodKey: `Lifecycle ${suffix}`,
     progress: 20,
     reviewerId: reviewer.id,
@@ -942,7 +950,6 @@ test("compliance work lifecycle is tenant-scoped, audited, and completed outside
       blockerNote: "Signed statements awaited from client",
       internalDueDate: "2026-08-18",
       legalEntityId: "40000000-0000-4000-8000-000000000001",
-      missingItemCount: 2,
       periodKey: `Lifecycle ${suffix}`,
       progress: 65,
       reviewerId: reviewer.id,
@@ -1066,7 +1073,9 @@ test("recurrence generates entitled work items once per period and audits the cr
     ));
     assert.ok(generated.length > 0);
     generatedIds.push(...generated.map((row) => row.id));
-    assert.ok(generated.every((row) => row.status === "waiting"));
+    // Generated work waits on nothing that has been recorded, so it does not
+    // claim to be waiting. `waiting` now means something nameable is outstanding.
+    assert.ok(generated.every((row) => row.status === "at_risk"));
     const secondRun = await generateRecurringWorkItems(database, identity.tenantId);
     assert.equal(secondRun, 0);
     const [audit] = await database.select({ action: auditEvents.action }).from(auditEvents).where(and(
@@ -1468,7 +1477,7 @@ test("a work item budget is a snapshot that later service-standard edits never r
     await updateService(database, identity.tenantId, identity.userId, audit.id, { ...audit, standardMinutes: 90 });
     const first = await createWorkItem(database, identity.tenantId, identity.userId, {
       assigneeId: identity.userId, blockerNote: "", budgetMinutes: null, internalDueDate: "2026-09-10",
-      legalEntityId: client.id, missingItemCount: 0, periodKey: `Budget A ${suffix}`, progress: 0,
+      legalEntityId: client.id, periodKey: `Budget A ${suffix}`, progress: 0,
       reviewerId: null, serviceKey: serviceCode, statutoryDueDate: "2026-09-15", status: "at_risk",
     });
     created.push(first);
@@ -1483,7 +1492,7 @@ test("a work item budget is a snapshot that later service-standard edits never r
 
     const second = await createWorkItem(database, identity.tenantId, identity.userId, {
       assigneeId: identity.userId, blockerNote: "", budgetMinutes: null, internalDueDate: "2026-10-10",
-      legalEntityId: client.id, missingItemCount: 0, periodKey: `Budget B ${suffix}`, progress: 0,
+      legalEntityId: client.id, periodKey: `Budget B ${suffix}`, progress: 0,
       reviewerId: null, serviceKey: serviceCode, statutoryDueDate: "2026-10-15", status: "at_risk",
     });
     created.push(second);
@@ -1515,13 +1524,13 @@ test("a bulk reassign applies the valid subset, reports the rest, and audits per
   try {
     const reviewerHeld = await createWorkItem(database, identity.tenantId, identity.userId, {
       assigneeId: identity.userId, blockerNote: "", budgetMinutes: null, internalDueDate: "2026-09-10",
-      legalEntityId: client.id, missingItemCount: 0, periodKey: `Bulk A ${suffix}`, progress: 0,
+      legalEntityId: client.id, periodKey: `Bulk A ${suffix}`, progress: 0,
       reviewerId: reviewer.id, serviceKey: serviceCode, statutoryDueDate: "2026-09-15", status: "at_risk",
     });
     created.push(reviewerHeld);
     const plain = await createWorkItem(database, identity.tenantId, identity.userId, {
       assigneeId: identity.userId, blockerNote: "", budgetMinutes: null, internalDueDate: "2026-09-11",
-      legalEntityId: client.id, missingItemCount: 0, periodKey: `Bulk B ${suffix}`, progress: 0,
+      legalEntityId: client.id, periodKey: `Bulk B ${suffix}`, progress: 0,
       reviewerId: null, serviceKey: serviceCode, statutoryDueDate: "2026-09-16", status: "at_risk",
     });
     created.push(plain);

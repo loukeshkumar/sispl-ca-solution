@@ -8,9 +8,17 @@ import {
   serviceCatalog,
   tenantMemberships,
   users,
+  workDependencies,
   workItems,
 } from "../../db/schema";
 import type { DashboardDatabase } from "../dashboard/postgres/repository";
+import { capabilityFor, governedServices } from "../team/capability-repository";
+import { meets } from "../team/capability";
+import { blockersFor, instantiateProcedure, progressFor } from "../procedures/repository";
+import { clearForCompletedWork, dependencyStanding } from "../dependencies/repository";
+import { refuseWaiting, WAITING_REFUSAL_NOTES } from "../dependencies/waiting";
+import { reviewStanding } from "../reviews/repository";
+import { refuseCompletion } from "../reviews/rounds";
 import { isServiceEntitled, listEntitledServices } from "../packages/repository";
 import { planBulkChange, type BulkAction, type BulkPlan } from "./bulk";
 import { workServiceEntitlementCode, type WorkInput } from "./validation";
@@ -19,12 +27,18 @@ const assigneeUsers = alias(users, "work_assignee");
 const reviewerUsers = alias(users, "work_reviewer");
 
 export class WorkRepositoryError extends Error {
-  constructor(public readonly code: "not_found" | "invalid_client" | "invalid_member" | "invalid_service") {
+  constructor(public readonly code: "not_found" | "invalid_client" | "invalid_member" | "invalid_service" | "reviewer_not_capable" | "steps_outstanding" | "review_outstanding" | "review_open" | "dependencies_outstanding" | "no_dependency") {
     super({
       not_found: "Work item not found.",
       invalid_client: "The selected client is not active in this tenant.",
       invalid_member: "The selected team member is not active in this tenant.",
       invalid_service: "The selected service is not included in this client's active package or add-ons.",
+      reviewer_not_capable: "The selected reviewer is not recorded as able to review this service. Choose someone who is, or record their capability first.",
+      steps_outstanding: "Mandatory steps of this obligation's procedure have not been done. Complete them, or mark them not applicable with a reason.",
+      review_outstanding: "The named reviewer has not approved this obligation. Submit it for review first.",
+      review_open: "This obligation is with its reviewer. It cannot be completed until they decide.",
+      dependencies_outstanding: "This obligation is still waiting on something. Clear what it waits on, or cancel the request, before completing it.",
+      no_dependency: WAITING_REFUSAL_NOTES.no_dependency,
     }[code]);
     this.name = "WorkRepositoryError";
   }
@@ -40,6 +54,10 @@ export type WorkEditorData = WorkInput & {
 
 export type Work360Data = Omit<WorkEditorData, "status"> & {
   assigneeName: string | null;
+  /** Read-only: the number of open dependencies, never a typed figure. */
+  missingItemCount: number;
+  /** Read-only: what the statutory date was before an extension moved it. */
+  originalStatutoryDueDate: string | null;
   reviewerName: string | null;
   status: WorkInput["status"] | "completed";
 };
@@ -51,6 +69,52 @@ async function assertActiveClient(database: Pick<DashboardDatabase, "select">, t
     eq(legalEntities.status, "active"),
   )).limit(1).for("key share");
   if (!client) throw new WorkRepositoryError("invalid_client");
+}
+
+/**
+ * The reviewer gate.
+ *
+ * Only for services the firm has taken a view on: a service nobody is yet
+ * recorded as able to review is not governed, so nothing is refused. That keeps
+ * the day this ships from being the day every reviewer field locks, and closes
+ * the gate service by service as the firm fills the matrix in.
+ */
+async function assertReviewerCapable(
+  database: DashboardDatabase,
+  tenantId: string,
+  reviewerId: string | null,
+  serviceKey: string,
+) {
+  if (!reviewerId) return;
+  const serviceCode = workServiceEntitlementCode(serviceKey);
+  const governed = await governedServices(database, tenantId);
+  if (!governed.has(serviceCode)) return;
+  const level = await capabilityFor(database, tenantId, reviewerId, serviceCode);
+  if (!meets(level, "review")) throw new WorkRepositoryError("reviewer_not_capable");
+}
+
+/**
+ * Giving somebody work they are not rated for is how people learn, so it is
+ * allowed — but recorded, because a stretch nobody can see is indistinguishable
+ * from a mistake when the job goes wrong.
+ */
+async function recordStretchAssignment(
+  database: DashboardDatabase,
+  tenantId: string,
+  actorUserId: string,
+  workItemId: string,
+  assigneeId: string | null,
+  serviceKey: string,
+) {
+  if (!assigneeId) return;
+  const serviceCode = workServiceEntitlementCode(serviceKey);
+  const level = await capabilityFor(database, tenantId, assigneeId, serviceCode);
+  if (meets(level, "prepare")) return;
+  await database.insert(auditEvents).values({
+    tenantId, actorUserId, resourceType: "work_item", resourceId: workItemId,
+    action: "work.capability_stretch",
+    reason: `${serviceCode}: assignee is ${level ? `only ${level}` : "unrated"}`,
+  });
 }
 
 async function assertActiveMember(database: Pick<DashboardDatabase, "select">, tenantId: string, userId: string | null) {
@@ -119,6 +183,7 @@ export async function createWorkItem(
     await assertServiceEntitlement(transaction, tenantId, input.legalEntityId, input.serviceKey);
     await assertActiveMember(transaction, tenantId, input.assigneeId);
     await assertActiveMember(transaction, tenantId, input.reviewerId);
+    await assertReviewerCapable(transaction, tenantId, input.reviewerId, input.serviceKey);
     // Copied once, at creation. Editing the service standard later must never
     // rewrite the budget on obligations already raised against the old figure.
     let budgetMinutes = input.budgetMinutes;
@@ -146,7 +211,8 @@ export async function createWorkItem(
       reviewerId: input.reviewerId,
       blockerNote: input.blockerNote,
       progress: input.progress,
-      missingItemCount: input.missingItemCount,
+      // Nothing can be outstanding on work that does not exist yet.
+      missingItemCount: 0,
     });
     await transaction.insert(auditEvents).values({
       tenantId,
@@ -156,6 +222,25 @@ export async function createWorkItem(
       action: "work.created",
       reason: "Created from the compliance workspace",
     });
+    await recordStretchAssignment(transaction, tenantId, actorUserId, workItemId, input.assigneeId, input.serviceKey);
+
+    // The procedure is copied onto the obligation now, from the version in force
+    // on its statutory date. Revising the procedure later never touches this
+    // copy, so the record can always say what was actually followed.
+    const versionId = await instantiateProcedure(
+      transaction, tenantId, workItemId, workServiceEntitlementCode(input.serviceKey), input.statutoryDueDate,
+    );
+    if (versionId) {
+      const progress = await progressFor(transaction, tenantId, workItemId);
+      if (progress.percent !== null) {
+        await transaction.update(workItems).set({ progress: progress.percent })
+          .where(and(eq(workItems.tenantId, tenantId), eq(workItems.id, workItemId)));
+      }
+      await transaction.insert(auditEvents).values({
+        tenantId, actorUserId, resourceType: "work_item", resourceId: workItemId,
+        action: "work.procedure_applied", reason: `${progress.total} steps`,
+      });
+    }
     return workItemId;
   });
 }
@@ -179,6 +264,20 @@ export async function updateWorkItem(
     }
     await assertActiveMember(transaction, tenantId, input.assigneeId);
     await assertActiveMember(transaction, tenantId, input.reviewerId);
+    await assertReviewerCapable(transaction, tenantId, input.reviewerId, input.serviceKey);
+
+    // Where a procedure governs this item, progress is counted from its steps
+    // and whatever the form sent is ignored — two sources for one number is how
+    // a figure ends up meaning nothing.
+    const counted = await progressFor(transaction, tenantId, workItemId);
+
+    // `waiting` used to mean whatever the note beside it said. It now means at
+    // least one thing is outstanding, recorded and chaseable.
+    const waitingRefusal = refuseWaiting({
+      openCount: (await dependencyStanding(transaction as unknown as DashboardDatabase, tenantId, workItemId)).open.length,
+      status: input.status,
+    });
+    if (waitingRefusal) throw new WorkRepositoryError(waitingRefusal);
 
     const [updated] = await transaction.update(workItems).set({
       // An explicit edit always wins, and clearing the field returns the item to
@@ -193,8 +292,14 @@ export async function updateWorkItem(
       assigneeId: input.assigneeId,
       reviewerId: input.reviewerId,
       blockerNote: input.blockerNote,
-      progress: input.progress,
-      missingItemCount: input.missingItemCount,
+      progress: counted.percent ?? input.progress,
+      // Derived from the open dependencies, never from the form. A count that
+      // somebody typed once and nobody decremented is how "2 items missing" came
+      // to sit beside work whose documents arrived a month ago.
+      missingItemCount: sql`(select count(*) from ${workDependencies}
+        where ${workDependencies.tenantId} = ${tenantId}
+          and ${workDependencies.workItemId} = ${workItemId}
+          and ${workDependencies.clearedAt} is null)`,
       updatedAt: new Date(),
     }).where(and(eq(workItems.id, workItemId), eq(workItems.tenantId, tenantId), ne(workItems.status, "completed"))).returning({ id: workItems.id });
     if (!updated) throw new WorkRepositoryError("not_found");
@@ -206,6 +311,7 @@ export async function updateWorkItem(
       action: "work.updated",
       reason: "Updated from Work Item 360",
     });
+    await recordStretchAssignment(transaction, tenantId, actorUserId, workItemId, input.assigneeId, input.serviceKey);
   });
 }
 
@@ -217,6 +323,29 @@ export async function completeWorkItem(
 ) {
   if (!tenantId.trim() || !actorUserId.trim() || !workItemId.trim()) throw new Error("Tenant, actor, and work item are required.");
   await database.transaction(async (transaction) => {
+    // Where a procedure was instantiated, the steps are the completion test.
+    // Marking an obligation done with its mandatory steps outstanding is the
+    // exact thing a typed progress field allowed and nobody could see.
+    const outstanding = await blockersFor(transaction, tenantId, workItemId);
+    if (outstanding.length > 0) throw new WorkRepositoryError("steps_outstanding");
+
+    // Where the firm named a reviewer, it said this obligation needs one. The
+    // status could always be set to `review` from a dropdown; an approval
+    // cannot, because somebody other than the submitter has to give it.
+    const [named] = await transaction.select({ reviewerId: workItems.reviewerId }).from(workItems)
+      .where(and(eq(workItems.tenantId, tenantId), eq(workItems.id, workItemId))).limit(1);
+    const refusal = refuseCompletion({
+      reviewerUserId: named?.reviewerId ?? null,
+      standing: await reviewStanding(transaction, tenantId, workItemId),
+    });
+    if (refusal) throw new WorkRepositoryError(refusal);
+
+    // Completing zeroes the missing-item count. Where that count is real rows
+    // rather than a typed figure, zeroing it while things are still outstanding
+    // would put the number and the record out of step with each other.
+    const waiting = await dependencyStanding(transaction as unknown as DashboardDatabase, tenantId, workItemId);
+    if (waiting.open.length > 0) throw new WorkRepositoryError("dependencies_outstanding");
+
     const [completed] = await transaction.update(workItems).set({
       status: "completed",
       progress: 100,
@@ -237,6 +366,9 @@ export async function completeWorkItem(
       action: "work.completed",
       reason: "Completed from Work Item 360",
     });
+
+    // Anything that was waiting on this one is no longer waiting.
+    await clearForCompletedWork(transaction, tenantId, actorUserId, workItemId);
   });
 }
 
@@ -258,6 +390,7 @@ export async function getWorkItem360(database: DashboardDatabase, tenantId: stri
     blockerNote: workItems.blockerNote,
     progress: workItems.progress,
     missingItemCount: workItems.missingItemCount,
+    originalStatutoryDueDate: workItems.originalStatutoryDueDate,
     budgetMinutes: workItems.budgetMinutes,
   }).from(workItems)
     .innerJoin(legalEntities, and(eq(legalEntities.id, workItems.legalEntityId), eq(legalEntities.tenantId, tenantId)))
@@ -275,6 +408,7 @@ export async function getWorkItem360(database: DashboardDatabase, tenantId: stri
     reviewerId: item.reviewerId ?? null,
     internalDueDate: item.internalDueDate ?? null,
     assigneeName: item.assigneeName ?? null,
+    originalStatutoryDueDate: item.originalStatutoryDueDate ?? null,
     reviewerName: item.reviewerName ?? null,
     status: item.status as Work360Data["status"],
   };
@@ -300,7 +434,6 @@ export function workEditorFrom(item: Work360Data | null): WorkEditorData | null 
     reviewerId: item.reviewerId,
     blockerNote: item.blockerNote,
     progress: item.progress,
-    missingItemCount: item.missingItemCount,
     budgetMinutes: item.budgetMinutes,
   };
 }
@@ -333,6 +466,7 @@ export async function applyBulkWorkChange(
       id: workItems.id,
       internalDueDate: workItems.internalDueDate,
       reviewerId: workItems.reviewerId,
+      serviceKey: workItems.serviceKey,
       statutoryDueDate: workItems.statutoryDueDate,
     }).from(workItems).where(and(
       eq(workItems.tenantId, tenantId),
@@ -341,6 +475,27 @@ export async function applyBulkWorkChange(
     )).for("update");
 
     const plan = planBulkChange(current, action);
+
+    // The reviewer gate has to hold here too. A batch is a faster way to do the
+    // same thing, not a way around the rule — and bulk already skips what it
+    // cannot do, with the reason attached, so an ungoverned item still applies.
+    if (action.kind === "reviewer" && action.memberId) {
+      const governed = await governedServices(transaction, tenantId);
+      const serviceByItem = new Map(current.map((item) => [item.id, workServiceEntitlementCode(item.serviceKey)]));
+      const levels = new Map<string, Awaited<ReturnType<typeof capabilityFor>>>();
+      const blocked: string[] = [];
+      for (const item of plan.apply) {
+        const code = serviceByItem.get(item.id)!;
+        if (!governed.has(code)) continue;
+        if (!levels.has(code)) levels.set(code, await capabilityFor(transaction, tenantId, action.memberId, code));
+        if (!meets(levels.get(code) ?? null, "review")) {
+          blocked.push(item.id);
+          plan.skip.push({ id: item.id, reason: `Not recorded as able to review ${code}.` });
+        }
+      }
+      plan.apply = plan.apply.filter((item) => !blocked.includes(item.id));
+    }
+
     for (const item of plan.apply) {
       const set = action.kind === "assignee" ? { assigneeId: action.memberId }
         : action.kind === "reviewer" ? { reviewerId: action.memberId }

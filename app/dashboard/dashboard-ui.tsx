@@ -31,6 +31,7 @@ export function KpiCard({
   note,
   onClick,
   pressed,
+  sparkValues,
   tone,
   value,
 }: {
@@ -39,9 +40,11 @@ export function KpiCard({
   note: string;
   onClick?: () => void;
   pressed?: boolean;
+  sparkValues?: number[];
   tone: "red" | "amber" | "blue" | "mint";
   value: string;
 }) {
+  const sparkMaximum = Math.max(1, ...(sparkValues ?? []));
   const contents = (
     <>
       <span className={`kpi-icon tone-${tone}`}><DashboardIcon name={icon} /></span>
@@ -50,9 +53,9 @@ export function KpiCard({
         <strong className="kpi-value">{value}</strong>
         <span className="kpi-note">{note}</span>
       </span>
-      <span className={`kpi-spark tone-${tone}`} aria-hidden="true">
-        {[38, 54, 44, 72, 61].map((height, index) => <i key={index} style={{ height: `${height}%` }} />)}
-      </span>
+      {sparkValues && sparkValues.length > 0 && <span className={`kpi-spark tone-${tone}`} aria-hidden="true">
+        {sparkValues.map((metric, index) => <i key={index} style={{ height: `${Math.max(4, (metric / sparkMaximum) * 100)}%` }} />)}
+      </span>}
     </>
   );
 
@@ -85,4 +88,33 @@ export function ProgressBar({ label, value }: { label: string; value: number }) 
 
 export function InitialsAvatar({ initials, tone = "violet" }: { initials: string; tone?: string }) {
   return <span aria-hidden="true" className={`initials-avatar avatar-${tone}`}>{initials}</span>;
+}
+
+/**
+ * An empty region explains why it is empty and what to do about it.
+ *
+ * "No results" alone leaves the reader guessing whether the filter is too tight,
+ * the data has not arrived, or the feature is unused — so a title names the
+ * state, the description names the next move, and an optional action performs
+ * it. Distinct from a loading skeleton: this is a settled answer, not a wait.
+ */
+export function EmptyState({
+  action,
+  description,
+  icon = "search",
+  title,
+}: {
+  action?: ReactNode;
+  description?: string;
+  icon?: DashboardIconName;
+  title: string;
+}) {
+  return (
+    <div className="empty-state">
+      <span className="empty-state-icon"><DashboardIcon name={icon} size={20} /></span>
+      <strong>{title}</strong>
+      {description && <p>{description}</p>}
+      {action && <div className="empty-state-action">{action}</div>}
+    </div>
+  );
 }

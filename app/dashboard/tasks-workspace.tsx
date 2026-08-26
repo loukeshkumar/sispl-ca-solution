@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 
 import { burnPercentage } from "../../lib/scheduling/capacity";
 import type { TaskCapacityLane, TaskQueueRow, TaskQueueTotals } from "../../lib/tasks/queue";
+import { availabilitySummary, BAND_LABELS, loadBand, loadPercentage, pendingWarning } from "../../lib/scheduling/availability";
 import {
   availableTaskScopes,
   taskQueueHref,
@@ -156,19 +157,30 @@ function TaskCapacity({ lanes, params }: { lanes: TaskCapacityLane[]; params: Ta
           <div className="work-capacity-lane" key={lane.memberId}>
             <span className="work-capacity-name">{lane.memberName}</span>
             {lane.weeks.map((cell) => {
-              const percentage = cell.availableMinutes > 0 ? Math.round((cell.loadMinutes / cell.availableMinutes) * 100) : 0;
+              const percentage = loadPercentage(cell.loadMinutes, cell.availableMinutes);
+              const band = loadBand(cell);
+              const pending = pendingWarning(cell, cell.loadMinutes);
               return (
                 <Link
-                  aria-label={`${lane.memberName}, week starting ${cell.weekStart}: ${percentage}% committed${cell.unestimatedCount ? `, ${cell.unestimatedCount} unestimated` : ""}`}
-                  className={`work-capacity-cell${percentage > 100 ? " is-over" : percentage >= 80 ? " is-tight" : ""}`}
+                  aria-label={`${lane.memberName}, week starting ${cell.weekStart}: ${availabilitySummary(cell)}${percentage === null ? "" : `, ${percentage}% committed`}${cell.unestimatedCount ? `, ${cell.unestimatedCount} unestimated` : ""}`}
+                  className={`work-capacity-cell is-${band}`}
                   href={taskQueueHref({ ...params, owner: lane.memberId, scope: "firm", view: "list" })}
                   key={cell.weekStart}
+                  title={`${availabilitySummary(cell)}${pending ? ` — ${pending}` : ""}`}
                 >
-                  <span className="work-capacity-bar" style={{ "--fill": `${Math.min(percentage, 100)}%` } as CSSProperties} />
-                  <strong>{percentage}%</strong>
+                  <span className="work-capacity-bar" style={{ "--fill": `${Math.min(percentage ?? 0, 100)}%` } as CSSProperties} />
+                  {/* A week with no time left is not 0% committed; it is a
+                      different fact, and one number cannot say both. */}
+                  <strong>{percentage === null ? BAND_LABELS.away : `${percentage}%`}</strong>
+                  {cell.availableMinutes > 0 && cell.availableMinutes < cell.baseMinutes && (
+                    <em className="work-capacity-reduced">
+                      {cell.holidays.length > 0 ? "holiday" : "leave"} · {Math.round(cell.availableMinutes / 60)}h left
+                    </em>
+                  )}
                   {/* An unestimated task adds no minutes, so say so rather than
                       letting an empty-looking lane read as free. */}
                   {cell.unestimatedCount > 0 && <em>+{cell.unestimatedCount} unestimated</em>}
+                  {pending && <em className="work-capacity-pending">leave pending</em>}
                 </Link>
               );
             })}

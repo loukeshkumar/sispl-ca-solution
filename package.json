@@ -11,20 +11,30 @@
     "start": "next start",
     "test": "npm run test:unit",
     "test:unit": "tsx --test tests/*-unit.test.ts",
-    "test:integration": "node --env-file=.env.local --import tsx --test tests/postgres-integration.test.ts",
+    "test:integration": "npm run db:setup:test && node --env-file=.env.local --import tsx --import ./scripts/db/test-environment.ts --test tests/postgres-integration.test.ts",
     "lint": "eslint . --ignore-pattern .next",
     "db:generate": "drizzle-kit generate",
     "db:migrate:local": "node --env-file=.env.local --import tsx scripts/db/migrate.ts",
     "db:seed:local": "node --env-file=.env.local --import tsx scripts/db/seed.ts",
     "db:check:local": "node --env-file=.env.local --import tsx scripts/db/check.ts",
-    "db:setup:local": "npm run db:migrate:local && npm run db:seed:local && npm run db:check:local"
+    "db:reconcile-documents:local": "node --env-file=.env.local --import tsx scripts/db/reconcile-documents.ts",
+    "db:setup:local": "npm run db:migrate:local && npm run db:seed:local && npm run db:check:local",
+    "db:setup:test": "node --env-file=.env.local --import tsx scripts/db/setup-test.ts",
+    "storage:check:local": "node --env-file=.env.local --import tsx scripts/storage/check.ts",
+    "jobs:notifications:local": "node --env-file=.env.local --import tsx scripts/jobs/notifications.ts",
+    "jobs:leave-accrual:local": "node --env-file=.env.local --import tsx scripts/jobs/leave-accrual.ts",
+    "db:backfill-leave-ledger:local": "node --env-file=.env.local --import tsx scripts/db/backfill-leave-ledger.ts",
+    "jobs:recurrence:local": "node --env-file=.env.local --import tsx scripts/jobs/recurrence.ts",
+    "jobs:daily:local": "npm run jobs:recurrence:local && npm run jobs:leave-accrual:local && npm run jobs:notifications:local"
   },
   "dependencies": {
     "drizzle-orm": "0.45.2",
-    "next": "16.2.6",
+    "lucide-react": "^1.31.0",
+    "next": "16.3.1",
     "pg": "^8.23.0",
     "react": "19.2.6",
-    "react-dom": "19.2.6"
+    "react-dom": "19.2.6",
+    "recharts": "^3.10.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "4.2.1",
@@ -34,7 +44,7 @@
     "@types/react-dom": "19.2.3",
     "drizzle-kit": "0.31.10",
     "eslint": "9.39.4",
-    "eslint-config-next": "16.2.6",
+    "eslint-config-next": "16.3.1",
     "postcss": "^8.5.26",
     "tailwindcss": "4.2.1",
     "tsx": "^4.23.12",

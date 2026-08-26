@@ -20,6 +20,7 @@ const WORK_STATUS: Record<DashboardRecords["workItems"][number]["status"], WorkS
   at_risk: "At risk",
   waiting: "Waiting",
   review: "Review",
+  completed: "Completed",
 };
 
 const COLOR_BY_STATUS: Record<WorkStatus, DashboardWorkItem["color"]> = {
@@ -27,6 +28,7 @@ const COLOR_BY_STATUS: Record<WorkStatus, DashboardWorkItem["color"]> = {
   "At risk": "blue",
   Waiting: "orange",
   Review: "green",
+  Completed: "green",
 };
 
 const DAY_MS = 86_400_000;
@@ -89,14 +91,15 @@ export function mapDashboardRecords(
   source: DataSource = "demo",
 ): DashboardData {
   const todayKey = dateKeyInIndia(now);
+  const openWorkItems = records.workItems.filter((item) => item.status !== "completed");
   const workByEntity = new Map<string, DashboardRecords["workItems"]>();
-  for (const item of records.workItems) {
+  for (const item of openWorkItems) {
     const existing = workByEntity.get(item.legalEntityId) ?? [];
     existing.push(item);
     workByEntity.set(item.legalEntityId, existing);
   }
 
-  const work: DashboardWorkItem[] = [...records.workItems]
+  const work: DashboardWorkItem[] = [...openWorkItems]
     .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
     .map((item) => {
       const status = WORK_STATUS[item.status];
@@ -105,7 +108,7 @@ export function mapDashboardRecords(
         id: item.id,
         client: item.clientName,
         initials: initials(item.clientName),
-        service: SERVICE_LABELS[item.serviceKey] ?? item.serviceKey,
+        service: item.serviceName ?? SERVICE_LABELS[item.serviceKey] ?? item.serviceKey,
         period: item.periodKey,
         owner: item.ownerName,
         ownerInitials: initials(item.ownerName),
@@ -135,7 +138,7 @@ export function mapDashboardRecords(
       health: client.healthScore,
       risk,
       next: nextWork
-        ? `${SERVICE_LABELS[nextWork.serviceKey] ?? nextWork.serviceKey} · ${dueLabels(nextWork.dueDate, todayKey).due}`
+        ? `${nextWork.serviceName ?? SERVICE_LABELS[nextWork.serviceKey] ?? nextWork.serviceKey} · ${dueLabels(nextWork.dueDate, todayKey).due}`
         : "No open obligation",
       missing: nextWork?.missingItems ?? 0,
       city: client.city,
@@ -153,8 +156,8 @@ export function mapDashboardRecords(
   }
 
   const administrator = records.members.find((member) => member.roleKey === "firm_administrator") ?? records.members[0];
-  const overdue = records.workItems.filter((item) => dayDifference(item.dueDate, todayKey) < 0).length;
-  const nonOverdue = Math.max(0, records.workItems.length - overdue);
+  const overdue = openWorkItems.filter((item) => dayDifference(item.dueDate, todayKey) < 0).length;
+  const nonOverdue = Math.max(0, openWorkItems.length - overdue);
   const healthyClients = clients.filter((client) => client.risk === "Healthy").length;
   const averageHealth = clients.length
     ? Math.round(clients.reduce((sum, client) => sum + client.health, 0) / clients.length)
@@ -163,6 +166,7 @@ export function mapDashboardRecords(
   return {
     source,
     generatedAt: now.toISOString(),
+    todayKey,
     titleDate: titleDate(now),
     practice: {
       name: records.tenant.displayName,
@@ -182,22 +186,22 @@ export function mapDashboardRecords(
       attentionClients: clients.filter((client) => client.risk !== "Healthy").length,
       criticalClients: clients.filter((client) => client.risk === "Critical").length,
       overdue,
-      dueThisWeek: records.workItems.filter((item) => {
+      dueThisWeek: openWorkItems.filter((item) => {
         const difference = dayDifference(item.dueDate, todayKey);
         return difference >= 0 && difference <= 7;
       }).length,
-      waitingOnClient: records.workItems.filter((item) => item.status === "waiting").length,
-      pendingReview: records.workItems.filter((item) => item.status === "review").length,
-      completed: 0,
-      onTimeRate: records.workItems.length ? Math.round((nonOverdue / records.workItems.length) * 100) : 100,
-      attentionNeeded: records.workItems.length,
+      waitingOnClient: openWorkItems.filter((item) => item.status === "waiting").length,
+      pendingReview: openWorkItems.filter((item) => item.status === "review").length,
+      completed: records.workItems.filter((item) => item.status === "completed").length,
+      onTimeRate: openWorkItems.length ? Math.round((nonOverdue / openWorkItems.length) * 100) : 100,
+      attentionNeeded: openWorkItems.length,
       averageHealth,
     },
     clients,
     work,
     deadlines: work.map((item) => {
       const date = new Date(`${item.dueDate}T00:00:00Z`);
-      const related = records.workItems.filter((candidate) => candidate.dueDate === item.dueDate && candidate.serviceKey === records.workItems.find((raw) => raw.id === item.id)?.serviceKey);
+      const related = openWorkItems.filter((candidate) => candidate.dueDate === item.dueDate && candidate.serviceKey === openWorkItems.find((raw) => raw.id === item.id)?.serviceKey);
       return {
         id: item.id,
         day: new Intl.DateTimeFormat("en-GB", { day: "2-digit", timeZone: "UTC" }).format(date),

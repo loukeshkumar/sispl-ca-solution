@@ -1,6 +1,11 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { headers } from "next/headers";
+import { Suspense } from "react";
+import { SelectSearch } from "./dashboard/select-search";
+import { SidebarScript } from "./dashboard/sidebar-script";
+import { RouteToasts, ToastProvider } from "./dashboard/toast";
+import { ThemeProvider } from "./theme/theme-provider";
+import { ThemeScript } from "./theme/theme-script";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -17,15 +22,10 @@ const title = "SISPL CA Solution — Practice, in command.";
 const description = "Practice command centre for Indian chartered accountants, with client health, compliance deadlines, and priority work in one secure view.";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const requestHeaders = await headers();
-  const forwardedHost = requestHeaders.get("x-forwarded-host")?.split(",")[0]?.trim();
-  const requestHost = forwardedHost ?? requestHeaders.get("host") ?? "localhost";
-  const safeHost = /^[a-z0-9.-]+(?::\d+)?$/i.test(requestHost) ? requestHost : "localhost";
-  const forwardedProtocol = requestHeaders.get("x-forwarded-proto")?.split(",")[0]?.trim();
-  const protocol = forwardedProtocol === "http" || forwardedProtocol === "https"
-    ? forwardedProtocol
-    : safeHost.startsWith("localhost") || safeHost.startsWith("127.0.0.1") ? "http" : "https";
-  const metadataBase = new URL(`${protocol}://${safeHost}`);
+  const configuredPublicUrl = process.env.SISPL_PUBLIC_URL;
+  const metadataBase = configuredPublicUrl && /^https?:\/\//i.test(configuredPublicUrl)
+    ? new URL(configuredPublicUrl)
+    : new URL("http://localhost:3000");
   const socialImage = new URL("/og.png", metadataBase);
 
   return {
@@ -57,11 +57,21 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head><ThemeScript /><SidebarScript /></head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        suppressHydrationWarning
       >
-        {children}
+        <ThemeProvider>
+          <ToastProvider>
+            {/* Reading the query string suspends; the page must not wait on a confirmation. */}
+            <Suspense fallback={null}><RouteToasts /></Suspense>
+            {children}
+            {/* Makes every long dropdown searchable, existing and future alike. */}
+            <SelectSearch />
+          </ToastProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

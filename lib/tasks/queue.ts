@@ -3,6 +3,8 @@ import { alias } from "drizzle-orm/pg-core";
 
 import {
   employeeWorkProfiles,
+  holidayCalendar,
+  leaveRequests,
   legalEntities,
   officeTasks,
   shiftTypes,
@@ -13,6 +15,7 @@ import {
 } from "../../db/schema";
 import type { DashboardDatabase } from "../dashboard/postgres/repository";
 import { capacityHorizonWeeks, weeklyAvailableMinutes, weekStartKey } from "../scheduling/capacity";
+import { weekAvailability, type DayPortion, type WeekAvailability } from "../scheduling/availability";
 import type { TaskQueueParams, TaskScope } from "./queue-params";
 import type { TaskPriority, TaskStatus } from "./validation";
 
@@ -194,8 +197,14 @@ export async function getTaskQueueTotals(
   };
 }
 
-export type TaskCapacityCell = { availableMinutes: number; loadMinutes: number; unestimatedCount: number; weekStart: string };
-export type TaskCapacityLane = { availableMinutes: number; memberId: string; memberName: string; weeks: TaskCapacityCell[] };
+export type TaskCapacityCell = WeekAvailability & { loadMinutes: number; unestimatedCount: number };
+export type TaskCapacityLane = {
+  /** The shift mask alone, for a lane header. Individual weeks differ from it. */
+  availableMinutes: number;
+  memberId: string;
+  memberName: string;
+  weeks: TaskCapacityCell[];
+};
 
 const CAPACITY_WEEKS = 4;
 
@@ -219,6 +228,7 @@ export async function getTaskCapacityLanes(
     fullDayMinutes: sql<number>`coalesce(${shiftTypes.fullDayMinutes}, ${defaultShift.fullDayMinutes}, 450)`,
     memberId: users.id,
     memberName: users.fullName,
+    workLocationState: employeeWorkProfiles.workLocationState,
     workingWeekMask: sql<string>`coalesce(${shiftTypes.workingWeekMask}, ${defaultShift.workingWeekMask}, '1111110')`,
   }).from(tenantMemberships)
     .innerJoin(users, eq(users.id, tenantMemberships.userId))
@@ -245,21 +255,59 @@ export async function getTaskCapacityLanes(
     sql`${officeTasks.dueDate} < ${horizonEnd}::date`,
   ));
 
+  // Availability is now a fact about each week rather than one number repeated
+  // across the horizon: a lane that read 2,700 minutes while somebody was on
+  // approved leave was a plan built on a figure nobody had checked.
+  const [holidayRows, leaveRows] = await Promise.all([
+    database.select({
+      holidayDate: holidayCalendar.holidayDate,
+      holidayType: holidayCalendar.holidayType,
+      jurisdictionState: holidayCalendar.jurisdictionState,
+      name: holidayCalendar.name,
+    }).from(holidayCalendar).where(and(
+      eq(holidayCalendar.tenantId, tenantId),
+      eq(holidayCalendar.status, "active"),
+      sql`${holidayCalendar.holidayDate} >= ${horizon[0]}::date`,
+      sql`${holidayCalendar.holidayDate} < ${horizonEnd}::date`,
+    )),
+    database.select({
+      dateFrom: leaveRequests.dateFrom,
+      dateTo: leaveRequests.dateTo,
+      dayPortion: leaveRequests.dayPortion,
+      employeeUserId: leaveRequests.employeeUserId,
+      status: leaveRequests.status,
+    }).from(leaveRequests).where(and(
+      eq(leaveRequests.tenantId, tenantId),
+      inArray(leaveRequests.status, ["approved", "pending"]),
+      sql`${leaveRequests.dateTo} >= ${horizon[0]}::date`,
+      sql`${leaveRequests.dateFrom} < ${horizonEnd}::date`,
+    )),
+  ]);
+
+  const holidays = holidayRows.map((row) => ({ ...row }));
+  const leave = leaveRows.map((row) => ({ ...row, dayPortion: row.dayPortion as DayPortion }));
+
   return members.map((member) => {
-    const availableMinutes = weeklyAvailableMinutes(Number(member.fullDayMinutes), member.workingWeekMask);
     const mine = open.filter((task) => task.assigneeId === member.memberId);
     return {
-      availableMinutes,
+      availableMinutes: weeklyAvailableMinutes(Number(member.fullDayMinutes), member.workingWeekMask),
       memberId: member.memberId,
       memberName: member.memberName,
       weeks: horizon.map((weekStart) => {
         const inWeek = mine.filter((task) => weekStartKey(task.dueDate) === weekStart);
         return {
-          availableMinutes,
+          ...weekAvailability({
+            employeeUserId: member.memberId,
+            fullDayMinutes: Number(member.fullDayMinutes),
+            holidays,
+            leave,
+            weekStart,
+            workLocationState: member.workLocationState,
+            workingWeekMask: member.workingWeekMask,
+          }),
           loadMinutes: inWeek.reduce((total, task) => total + (task.estimateMinutes ?? 0), 0),
           // Reported separately so an empty-looking lane reads as unknown, not free.
           unestimatedCount: inWeek.filter((task) => task.estimateMinutes === null).length,
-          weekStart,
         };
       }),
     };

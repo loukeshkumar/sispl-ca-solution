@@ -1,0 +1,2 @@
+DROP INDEX "leave_ledger_entries_tenant_dedupe_unique";--> statement-breakpoint
+CREATE UNIQUE INDEX "leave_ledger_entries_employee_dedupe_unique" ON "leave_ledger_entries" USING btree ("tenant_id","employee_user_id","dedupe_key") WHERE "leave_ledger_entries"."dedupe_key" is not null;

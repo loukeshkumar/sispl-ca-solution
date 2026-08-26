@@ -18,7 +18,6 @@ export type WorkInput = {
   budgetMinutes: number | null;
   internalDueDate: string | null;
   legalEntityId: string;
-  missingItemCount: number;
   periodKey: string;
   progress: number;
   reviewerId: string | null;
@@ -57,7 +56,6 @@ export function validateWorkFields(fields: WorkFormFields, allowedServiceKeys?: 
   const reviewerId = text(fields, "reviewerId");
   const blockerNote = text(fields, "blockerNote");
   const progress = Number(text(fields, "progress"));
-  const missingItemCount = Number(text(fields, "missingItemCount"));
   const fieldErrors: WorkFieldErrors = {};
 
   if (!UUID_PATTERN.test(legalEntityId)) fieldErrors.legalEntityId = "Select an active client.";
@@ -74,9 +72,10 @@ export function validateWorkFields(fields: WorkFormFields, allowedServiceKeys?: 
   if (reviewerId && !UUID_PATTERN.test(reviewerId)) fieldErrors.reviewerId = "Select a valid reviewer.";
   if (assigneeId && reviewerId && assigneeId === reviewerId) fieldErrors.reviewerId = "Reviewer must be different from the assignee.";
   if (blockerNote.length > 500) fieldErrors.blockerNote = "Blocker note cannot exceed 500 characters.";
-  if (status === "waiting" && blockerNote.length < 3) fieldErrors.blockerNote = "Explain what is awaited before using Waiting status.";
+  // No rule here about `waiting` needing a note. What the work waits on is a
+  // record now, not a sentence, and the repository refuses the status when
+  // nothing is outstanding — which a form cannot know.
   if (!Number.isInteger(progress) || progress < 0 || progress > 99) fieldErrors.progress = "Open work progress must be between 0 and 99.";
-  if (!Number.isInteger(missingItemCount) || missingItemCount < 0 || missingItemCount > 999) fieldErrors.missingItemCount = "Missing item count must be between 0 and 999.";
 
   const budgetMinutesRaw = text(fields, "budgetMinutes");
   let budgetMinutes: number | null = null;
@@ -98,7 +97,6 @@ export function validateWorkFields(fields: WorkFormFields, allowedServiceKeys?: 
       budgetMinutes,
       internalDueDate: internalDueDate || null,
       legalEntityId,
-      missingItemCount,
       periodKey,
       progress,
       reviewerId: reviewerId || null,

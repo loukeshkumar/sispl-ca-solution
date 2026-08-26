@@ -1,9 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { and, asc, desc, eq, isNotNull, isNull, lte, or, gte, sql } from "drizzle-orm";
 
-import { auditEvents, clientPackageAssignmentServices, clientPackageAssignments, complianceSchedules, filingAcknowledgements, legalEntities, serviceCatalog, workItems } from "../../db/schema";
+import { auditEvents, clientComplianceSchedules, clientPackageAssignmentServices, clientPackageAssignments, complianceExtensions, complianceSchedules, filingAcknowledgements, legalEntities, serviceCatalog, workItems } from "../../db/schema";
 import type { DashboardDatabase } from "../dashboard/postgres/repository";
 import { diffCoverage, isEntitledAt, type EntitlementWindow, type ExpectedObligation } from "./coverage";
+import type { ClientScheduleOverride, ComplianceExtension, ScheduleMode } from "./client-schedules";
 import { addDaysToDateKey, buildRecurringWorkDrafts, type ComplianceFrequency, type ComplianceScheduleRule, type EntitledService } from "./recurrence";
 import type { ComplianceScheduleInput } from "./validation";
 
@@ -156,6 +157,60 @@ export async function listActiveScheduleRules(database: DashboardDatabase, tenan
   }));
 }
 
+/**
+ * Standing departures from the firm calendar, read on every generation run.
+ *
+ * Lives here rather than beside the admin functions because the generator needs
+ * it and the admin module already depends on this one; the other direction
+ * would make the two circular.
+ */
+export async function listClientScheduleOverrides(
+  database: DashboardDatabase,
+  tenantId: string,
+): Promise<ClientScheduleOverride[]> {
+  const rows = await database.select({
+    dueDay: clientComplianceSchedules.dueDay,
+    dueMonthOffset: clientComplianceSchedules.dueMonthOffset,
+    effectiveFrom: clientComplianceSchedules.effectiveFrom,
+    frequency: clientComplianceSchedules.frequency,
+    internalLeadDays: clientComplianceSchedules.internalLeadDays,
+    legalEntityId: clientComplianceSchedules.legalEntityId,
+    mode: clientComplianceSchedules.mode,
+    serviceCode: clientComplianceSchedules.serviceCode,
+  }).from(clientComplianceSchedules)
+    .where(eq(clientComplianceSchedules.tenantId, tenantId));
+
+  return rows.map((row) => ({
+    effectiveFrom: row.effectiveFrom,
+    legalEntityId: row.legalEntityId,
+    mode: row.mode as ScheduleMode,
+    rule: row.mode === "override"
+      ? {
+        dueDay: row.dueDay!,
+        dueMonthOffset: row.dueMonthOffset!,
+        frequency: row.frequency as ComplianceFrequency,
+        internalLeadDays: row.internalLeadDays!,
+        serviceCode: row.serviceCode.toUpperCase(),
+      }
+      : null,
+    serviceCode: row.serviceCode.toUpperCase(),
+  }));
+}
+
+export async function listComplianceExtensions(
+  database: DashboardDatabase,
+  tenantId: string,
+): Promise<ComplianceExtension[]> {
+  const rows = await database.select({
+    extendedDueDate: complianceExtensions.extendedDueDate,
+    legalEntityId: complianceExtensions.legalEntityId,
+    periodKey: complianceExtensions.periodKey,
+    serviceCode: complianceExtensions.serviceCode,
+  }).from(complianceExtensions)
+    .where(eq(complianceExtensions.tenantId, tenantId));
+  return rows.map((row) => ({ ...row, serviceCode: row.serviceCode.toUpperCase() }));
+}
+
 export async function listEntitledServices(database: DashboardDatabase, tenantId: string, todayKey: string): Promise<EntitledService[]> {
   requireTenant(tenantId);
   const rows = await database.select({
@@ -183,11 +238,13 @@ export async function listEntitledServices(database: DashboardDatabase, tenantId
 export async function generateRecurringWorkItems(database: DashboardDatabase, tenantId: string, now = new Date()) {
   requireTenant(tenantId);
   const todayKey = indiaDateKey(now);
-  const [schedules, entitlements] = await Promise.all([
+  const [schedules, entitlements, overrides, extensions] = await Promise.all([
     listActiveScheduleRules(database, tenantId, todayKey),
     listEntitledServices(database, tenantId, todayKey),
+    listClientScheduleOverrides(database, tenantId),
+    listComplianceExtensions(database, tenantId),
   ]);
-  const drafts = buildRecurringWorkDrafts({ schedules, entitlements, todayKey });
+  const drafts = buildRecurringWorkDrafts({ entitlements, extensions, overrides, schedules, todayKey });
   let created = 0;
   for (const draft of drafts) {
     const id = randomUUID();
@@ -199,6 +256,7 @@ export async function generateRecurringWorkItems(database: DashboardDatabase, te
       periodKey: draft.periodKey,
       status: draft.status,
       statutoryDueDate: draft.statutoryDueDate,
+      originalStatutoryDueDate: draft.originalStatutoryDueDate,
       internalDueDate: draft.internalDueDate,
       assigneeId: null,
       reviewerId: null,
@@ -273,7 +331,7 @@ export async function listCoverageGaps(
 ): Promise<CoverageGap[]> {
   requireTenant(tenantId);
   const fromKey = addDaysToDateKey(todayKey, -Math.abs(lookbackDays));
-  const [schedules, windows, clients, raised] = await Promise.all([
+  const [schedules, windows, clients, raised, overrides, extensions] = await Promise.all([
     listActiveScheduleRules(database, tenantId, todayKey),
     listEntitlementWindows(database, tenantId),
     database.select({ id: legalEntities.id, displayName: legalEntities.displayName }).from(legalEntities).where(and(
@@ -284,12 +342,17 @@ export async function listCoverageGaps(
       periodKey: workItems.periodKey,
       serviceKey: workItems.serviceKey,
     }).from(workItems).where(eq(workItems.tenantId, tenantId)),
+    listClientScheduleOverrides(database, tenantId),
+    listComplianceExtensions(database, tenantId),
   ]);
 
   // Every entity that has ever been entitled to the service, so the period
   // arithmetic runs once; entitlement is then checked per period below.
   const everEntitled = windows.map((row) => ({ legalEntityId: row.legalEntityId, serviceCode: row.serviceCode }));
-  const candidates = buildRecurringWorkDrafts({ schedules, entitlements: everEntitled, todayKey, fromKey });
+  // The same per-client resolution the generator uses, so coverage can never
+  // report a gap for a client who is exempt, nor miss one for a client whose
+  // own cadence raises periods the firm calendar would not.
+  const candidates = buildRecurringWorkDrafts({ entitlements: everEntitled, extensions, fromKey, overrides, schedules, todayKey });
   const entitledOn = (legalEntityId: string, serviceCode: string, dateKey: string) => windows.some((row) => (
     row.legalEntityId === legalEntityId && row.serviceCode === serviceCode.toUpperCase() && isEntitledAt(row, dateKey)
   ));
@@ -334,7 +397,8 @@ export async function raiseCoverageGap(
     legalEntityId: gap.legalEntityId,
     serviceKey: gap.serviceKey,
     periodKey: gap.periodKey,
-    status: "waiting",
+    // Newly raised work that nobody has started is not work that is waiting.
+    status: "at_risk",
     statutoryDueDate: gap.statutoryDueDate,
     internalDueDate: gap.internalDueDate,
     assigneeId: null,

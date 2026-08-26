@@ -1,3 +1,7 @@
+-- DEPRECATED REFERENCE ONLY.
+-- Do not run this file. db/schema.ts and the ordered drizzle/*.sql migrations are
+-- the canonical schema and include newer tenant-integrity and lifecycle rules.
+
 create extension if not exists pgcrypto;
 
 create table tenants (
@@ -18,14 +22,48 @@ create table users (
   created_at timestamptz not null default now()
 );
 
+create table role_definitions (
+  id uuid primary key default gen_random_uuid(),
+  tenant_id uuid not null references tenants(id),
+  key text not null,
+  name text not null,
+  description text not null default '',
+  role_class text not null check (role_class in ('admin','employee')),
+  legacy_role_key text not null check (legacy_role_key in ('partner','manager','associate')),
+  is_system boolean not null default false,
+  status text not null default 'active' check (status in ('active','archived')),
+  version integer not null default 1 check (version > 0),
+  created_by_user_id uuid references users(id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (tenant_id,id),
+  unique (tenant_id,key),
+  unique (tenant_id,name)
+);
+
 create table tenant_memberships (
   id uuid primary key default gen_random_uuid(),
   tenant_id uuid not null references tenants(id),
   user_id uuid not null references users(id),
   role_key text not null,
+  access_class text not null default 'employee' check (access_class in ('super_admin','admin','employee')),
+  role_definition_id uuid,
+  authorization_version integer not null default 1 check (authorization_version > 0),
   status text not null default 'active',
   created_at timestamptz not null default now(),
-  unique (tenant_id,user_id)
+  unique (tenant_id,user_id),
+  unique (tenant_id,id),
+  foreign key (tenant_id,role_definition_id) references role_definitions(tenant_id,id)
+);
+
+create table role_permissions (
+  id uuid primary key default gen_random_uuid(),
+  tenant_id uuid not null references tenants(id),
+  role_definition_id uuid not null,
+  permission_key text not null,
+  created_at timestamptz not null default now(),
+  unique (tenant_id,role_definition_id,permission_key),
+  foreign key (tenant_id,role_definition_id) references role_definitions(tenant_id,id)
 );
 
 create table client_groups (

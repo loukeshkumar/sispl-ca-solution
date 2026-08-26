@@ -1,10 +1,18 @@
+"use client";
+
+import Link from "next/link";
+import { useState } from "react";
+
 import type { DashboardClient, DashboardData } from "../../lib/dashboard/types";
+import type { ClientHealthFilter } from "../../lib/dashboard/filters";
 import { DashboardIcon } from "./dashboard-icons";
-import { InitialsAvatar, KpiCard, PageTitle, ProgressBar, StatusBadge } from "./dashboard-ui";
+import ClientDialog from "./client-dialog";
+import { DocumentRequestDialogButton } from "./document-request-dialog";
+import { EmptyState, InitialsAvatar, KpiCard, PageTitle, ProgressBar, StatusBadge } from "./dashboard-ui";
 
-export type ClientSegment = "All clients" | "Healthy" | "Watch" | "Critical";
+export type ClientSegment = ClientHealthFilter;
 
-const segments: ClientSegment[] = ["All clients", "Healthy", "Watch", "Critical"];
+const segments: ClientSegment[] = ["All clients", "Healthy", "Need attention", "Watch", "Critical"];
 const riskTone = (risk: DashboardClient["risk"]) => ({ Critical: "red", Healthy: "mint", Watch: "amber" })[risk];
 
 function ClientKpis({
@@ -21,7 +29,7 @@ function ClientKpis({
       <KpiCard icon="clients" label="CLIENT GROUPS" note={`${data.metrics.legalEntities} legal entities`} onClick={() => onSegmentChange("All clients")} pressed={segment === "All clients"} tone="blue" value={String(data.metrics.clientGroups)} />
       <KpiCard icon="documents" label="GST REGISTRATIONS" note="Active registrations" tone="blue" value={String(data.metrics.gstRegistrations)} />
       <KpiCard icon="review" label="HEALTHY PORTFOLIO" note="Computed from client health" onClick={() => onSegmentChange("Healthy")} pressed={segment === "Healthy"} tone="mint" value={`${data.metrics.healthyPercentage}%`} />
-      <KpiCard icon="alert" label="NEED ATTENTION" note={`${data.metrics.criticalClients} critical clients`} onClick={() => onSegmentChange("Critical")} pressed={segment === "Critical"} tone="red" value={String(data.metrics.attentionClients)} />
+      <KpiCard icon="alert" label="NEED ATTENTION" note={`${data.metrics.criticalClients} critical clients`} onClick={() => onSegmentChange("Need attention")} pressed={segment === "Need attention"} tone="red" value={String(data.metrics.attentionClients)} />
     </section>
   );
 }
@@ -75,14 +83,14 @@ function ClientPortfolio({
             <span className="portfolio-owner"><InitialsAvatar initials={client.owner.split(" ").map((part) => part[0]).join("")} tone="light" /><strong>{client.owner}</strong></span>
           </button>
         ))}
-        {!clients.length && <div className="empty-state">No clients match the current filters.</div>}
+        {!clients.length && <EmptyState description="Widen the health filter or clear the search to see more of the firm's clients." icon="clients" title="No clients match these filters" />}
       </div>
     </section>
   );
 }
 
-function ClientDetail({ client }: { client: DashboardClient | undefined }) {
-  if (!client) return <aside className="client-detail-panel surface-card"><div className="empty-state">Select a client to view details.</div></aside>;
+function ClientDetail({ canWriteDocuments, client }: { canWriteDocuments: boolean; client: DashboardClient | undefined }) {
+  if (!client) return <aside className="client-detail-panel surface-card"><EmptyState description="Choose a client from the list to open their relationship, services, and open work." icon="clients" title="No client selected" /></aside>;
 
   return (
     <aside className="client-detail-panel surface-card">
@@ -115,13 +123,15 @@ function ClientDetail({ client }: { client: DashboardClient | undefined }) {
           <p className="detail-label">NEXT ACTION</p>
           <div className="client-next-action"><span><DashboardIcon name="clock" /></span><div><strong>{client.next}</strong><small>{client.missing ? `${client.missing} documents or exceptions need attention` : "Ready for completion"}</small></div></div>
         </section>
-        <div className="client-detail-actions"><button className="secondary-button" disabled type="button">Request document</button><button className="primary-button" disabled type="button">Open Client 360 <DashboardIcon name="arrow" size={16} /></button></div>
+        <div className="client-detail-actions">{canWriteDocuments ? <DocumentRequestDialogButton initialClientId={client.id} variant="secondary">Request document</DocumentRequestDialogButton> : <button className="secondary-button" disabled type="button">Request document</button>}<Link className="primary-button" href={`/clients/${client.id}`}>Open Client 360 <DashboardIcon name="arrow" size={16} /></Link></div>
       </div>
     </aside>
   );
 }
 
 export function ClientsWorkspace({
+  canWriteClients,
+  canWriteDocuments,
   clients,
   data,
   onClientSelect,
@@ -131,6 +141,8 @@ export function ClientsWorkspace({
   segment,
   selected,
 }: {
+  canWriteClients: boolean;
+  canWriteDocuments: boolean;
   clients: DashboardClient[];
   data: DashboardData;
   onClientSelect: (clientId: string) => void;
@@ -140,10 +152,11 @@ export function ClientsWorkspace({
   segment: ClientSegment;
   selected: DashboardClient | undefined;
 }) {
+  const [addOpen, setAddOpen] = useState(false);
   return (
     <div className="clients-workspace">
       <PageTitle
-        actions={<><button className="secondary-button" disabled type="button">Import clients</button><button className="primary-button" disabled type="button"><DashboardIcon name="plus" size={17} />Add client</button></>}
+        actions={canWriteClients ? <><button className="secondary-button" disabled type="button">Import clients</button><button className="primary-button" onClick={() => setAddOpen(true)} type="button"><DashboardIcon name="plus" size={17} />Add client</button></> : undefined}
         description="Manage identity, services, health, and upcoming obligations."
         eyebrow="CLIENT PORTFOLIO"
         title="Clients"
@@ -151,8 +164,10 @@ export function ClientsWorkspace({
       <ClientKpis data={data} onSegmentChange={onSegmentChange} segment={segment} />
       <section className="clients-main">
         <ClientPortfolio clients={clients} onClientSelect={onClientSelect} onQueryChange={onQueryChange} onSegmentChange={onSegmentChange} query={query} segment={segment} selected={selected} />
-        <ClientDetail client={selected} />
+        <ClientDetail canWriteDocuments={canWriteDocuments} client={selected} />
       </section>
+
+      <ClientDialog onClose={() => setAddOpen(false)} open={addOpen} />
     </div>
   );
 }
