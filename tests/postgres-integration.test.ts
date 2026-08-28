@@ -16,6 +16,7 @@ import { PasswordChangeError } from "../lib/auth/repository";
 import { createSessionToken, hashSessionToken } from "../lib/auth/tokens";
 import { archiveClient, ClientRepositoryError, createClient, getClient360Data, updateClient } from "../lib/clients/repository";
 import { SEEDED_TENANT_ID } from "../lib/dashboard/fixtures";
+import { FIRM_SCOPE } from "../lib/dashboard/scope";
 import { listDirectReports } from "../lib/dashboard/scope";
 import { applyBulkRequestCancel, cancelDocumentRequest, createDocumentRequest, getDocumentMetadata, listDocumentWorkspace, recordDocumentUpload } from "../lib/documents/repository";
 import { mapDashboardRecords } from "../lib/dashboard/mapper";
@@ -705,6 +706,45 @@ test("direct reports are read from the reporting line and stay inside the firm",
       await database.delete(users).where(eq(users.id, plantedUserId));
     }
   }
+});
+
+test("dashboard records narrow to the scope they are loaded with", async () => {
+  const database = getDatabase();
+  const identity = await findLoginIdentity(database, "loukesh@example.invalid", "sharma-kumar-ca");
+  assert.ok(identity);
+
+  const firm = await loadDashboardRecords(database, identity.tenantId, FIRM_SCOPE);
+  assert.ok(firm.workItems.length > 0, "the seeded firm has work to scope");
+
+  // Nobody's own scope may exceed the firm's, and every item it returns must be
+  // one the firm load also returned.
+  const assignees = await database.select({ assigneeId: workItems.assigneeId })
+    .from(workItems).where(eq(workItems.tenantId, identity.tenantId));
+  const someAssignee = assignees.map((row) => row.assigneeId).find((id): id is string => Boolean(id));
+  assert.ok(someAssignee, "the seeded firm has an assigned work item");
+
+  const own = await loadDashboardRecords(database, identity.tenantId, { kind: "own", userId: someAssignee });
+  assert.ok(own.workItems.length > 0);
+  assert.ok(own.workItems.length <= firm.workItems.length);
+  const firmIds = new Set(firm.workItems.map((item) => item.id));
+  for (const item of own.workItems) assert.ok(firmIds.has(item.id));
+
+  // The client list follows the work, so it can never name an entity the
+  // viewer has no work against.
+  const ownEntityIds = new Set(own.workItems.map((item) => item.legalEntityId));
+  for (const client of own.clients) assert.ok(ownEntityIds.has(client.id));
+
+  // A scope naming nobody returns no work at all, and never falls back to the firm.
+  const stranger = await loadDashboardRecords(database, identity.tenantId, { kind: "own", userId: randomUUID() });
+  assert.equal(stranger.workItems.length, 0);
+  assert.equal(stranger.clients.length, 0);
+
+  // A team scope is the union of its members, so it contains the own scope.
+  const team = await loadDashboardRecords(database, identity.tenantId, { kind: "team", userIds: [someAssignee] });
+  assert.equal(team.workItems.length, own.workItems.length);
+
+  // The members list is not scoped: it supplies names, not business data.
+  assert.equal(own.members.length, firm.members.length);
 });
 
 test("employee disabling and task assignment serialize on the membership boundary", async () => {
