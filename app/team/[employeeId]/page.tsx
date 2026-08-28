@@ -98,7 +98,7 @@ export default async function Employee360Page({ params, searchParams }: { params
         <div className="client-360-title-row">
           <div className="client-360-identity">
             <InitialsAvatar initials={initials(employee.fullName)} />
-            <span><p className="eyebrow">EMPLOYEE 360</p><h1>Employee 360 · {employee.fullName}</h1><small>{employee.employeeCode} · {employee.designation}</small></span>
+            <span><p className="eyebrow">EMPLOYEE 360</p><h1>{employee.fullName}</h1><small>{employee.employeeCode} · {employee.designation} · {employee.roleName}</small></span>
           </div>
           {canManage && employee.accessClass !== "super_admin" && employee.status === "active" && <div className="client-360-actions"><EmployeeDialogButton employeeId={employee.id} initial={{ ...employee, roleDefinitionId: employee.roleDefinitionId ?? undefined }} title={`Edit ${employee.fullName}`} variant="secondary">Edit employee</EmployeeDialogButton></div>}
         </div>
@@ -140,7 +140,6 @@ export default async function Employee360Page({ params, searchParams }: { params
 
       <section className="employee-360-grid">
         <article className="surface-card employee-360-main">
-          <div className="employee-overview-heading"><div><p className="eyebrow">EMPLOYMENT PROFILE</p><h2>{employee.designation}</h2></div><StatusBadge tone={employee.status === "active" ? "mint" : "red"}>{employee.status === "active" ? "Active" : "Disabled"}</StatusBadge></div>
           <WorkspaceTabs
             ariaLabel="Employee views"
             tabs={[

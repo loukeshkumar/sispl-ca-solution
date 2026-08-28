@@ -15,7 +15,9 @@ test("employee management routes enforce team permissions and accessible forms",
   assert.match(actions, /requirePermission\("team:manage"/);
   assert.match(form, /aria-describedby/);
   assert.match(form, /aria-invalid/);
-  assert.match(employeePage, /Employee 360/);
+  // The eyebrow names the page; the heading is the person, so the phrase is
+  // not repeated in both.
+  assert.match(employeePage, /EMPLOYEE 360/);
   assert.match(employeePage, /Provision login access/);
   assert.match(employeePage, /hasPermission\(session, "attendance:review"\)/);
   assert.match(employeePage, /hasPermission\(session, "salary:manage"\)/);

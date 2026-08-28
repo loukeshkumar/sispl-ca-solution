@@ -9330,6 +9330,24 @@ button.row-action-link {
 }
 
 
+/*
+ * The rail carries the access facts, which stay relevant while the reader
+ * works down a long tab panel — so it follows rather than scrolling away and
+ * leaving a column of nothing beside it.
+ */
+.employee-access-card {
+  align-self: start;
+  position: sticky;
+  top: 16px;
+}
+
+/* Six views is primary navigation, not a footnote under a card heading. */
+.employee-360-main > .workspace-tabs > .workspace-tablist {
+  border-bottom: 1px solid var(--line);
+  margin: -6px 0 18px;
+  padding-bottom: 2px;
+}
+
 /* ---- Employee statutory record ----------------------------------------- */
 
 .employee-compliance {
