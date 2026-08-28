@@ -9348,9 +9348,16 @@ button.row-action-link {
   border-radius: 12px;
   color: var(--accent-strong);
   display: flex;
+  flex: 0 0 auto;
   height: 38px;
   justify-content: center;
   width: 38px;
+}
+
+/* Without a size the icon renders at its intrinsic scale and overflows the tile. */
+.role-members-card > header > span svg {
+  height: 17px;
+  width: 17px;
 }
 
 .role-members-card > header h2 {
