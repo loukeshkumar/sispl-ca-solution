@@ -57,12 +57,29 @@ export function ProcedureEditor({
     <>
       {error && <p className="package-form-banner" role="alert">{error}</p>}
 
-      {uncovered.length > 0 && (
-        <p className="procedure-uncovered" role="status">
-          <strong>{uncovered.length} of {services.length} services have no published procedure.</strong>{" "}
-          Work raised for {uncovered.map((service) => service.name).join(", ")} keeps a hand-typed progress figure and
-          nothing records what was actually done.
-        </p>
+      {/*
+        * Coverage is a ratio, so it is drawn as one. The uncovered services are
+        * named as chips rather than a comma list: a firm with a dozen of them
+        * had a sentence nobody could scan.
+        */}
+      {services.length > 0 && (
+        <section className={`procedure-coverage${uncovered.length === 0 ? " is-complete" : ""}`} role="status">
+          <div className="procedure-coverage-head">
+            <strong>{services.length - uncovered.length} of {services.length} services have a published procedure</strong>
+            <b>{Math.round(((services.length - uncovered.length) / services.length) * 100)}%</b>
+          </div>
+          <span className="procedure-coverage-bar">
+            <i style={{ width: `${((services.length - uncovered.length) / services.length) * 100}%` }} />
+          </span>
+          {uncovered.length > 0 ? (
+            <p>
+              <span>Still typed by hand:</span>
+              {uncovered.map((service) => <b key={service.code}>{service.name}</b>)}
+            </p>
+          ) : (
+            <p><span>Every service records what was actually done rather than a typed figure.</span></p>
+          )}
+        </section>
       )}
 
       <section className="surface-card procedure-panel">

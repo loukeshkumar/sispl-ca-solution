@@ -4,6 +4,7 @@ import { hasPermission } from "../../../lib/auth/authorization";
 import { requirePermission } from "../../../lib/auth/server";
 import { getDatabase } from "../../../lib/dashboard/postgres/pool";
 import { listMasterDataWorkspace } from "../../../lib/master-data/repository";
+import { KpiCard } from "../../dashboard/dashboard-ui";
 import ChecklistRegister from "./checklist-register";
 
 export const dynamic = "force-dynamic";
@@ -24,11 +25,35 @@ export default async function MasterDataPage() {
         </div>
       </header>
 
-      <section className="package-kpi-grid kpi-grid">
-        <article className="surface-card checklist-kpi"><span>ACTIVE</span><strong>{String(workspace.metrics.active).padStart(2, "0")}</strong><small>Offered when raising a request</small></article>
-        <article className="surface-card checklist-kpi"><span>USUALLY MANDATORY</span><strong>{String(workspace.metrics.mandatory).padStart(2, "0")}</strong><small>Flagged as normally required</small></article>
-        <article className="surface-card checklist-kpi"><span>LINKED TO A SERVICE</span><strong>{String(workspace.metrics.linkedToServices).padStart(2, "0")}</strong><small>Suggested by engagement type</small></article>
-        <article className="surface-card checklist-kpi"><span>ARCHIVED</span><strong>{String(workspace.metrics.archived).padStart(2, "0")}</strong><small>Kept for history only</small></article>
+      <section className="kpi-grid">
+        <KpiCard
+          icon="documents"
+          label="ACTIVE"
+          note="Offered when raising a request"
+          tone={workspace.metrics.active ? "blue" : "amber"}
+          value={String(workspace.metrics.active).padStart(2, "0")}
+        />
+        <KpiCard
+          icon="alert"
+          label="USUALLY MANDATORY"
+          note="Flagged as normally required"
+          tone="amber"
+          value={String(workspace.metrics.mandatory).padStart(2, "0")}
+        />
+        <KpiCard
+          icon="services"
+          label="LINKED TO A SERVICE"
+          note="Suggested by engagement type"
+          tone="mint"
+          value={String(workspace.metrics.linkedToServices).padStart(2, "0")}
+        />
+        <KpiCard
+          icon="documents"
+          label="ARCHIVED"
+          note="Kept for history only"
+          tone="blue"
+          value={String(workspace.metrics.archived).padStart(2, "0")}
+        />
       </section>
 
       <ChecklistRegister canManage={canManage} workspace={workspace} />

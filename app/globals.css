@@ -9330,6 +9330,82 @@ button.row-action-link {
 }
 
 
+/* Procedure coverage: a ratio drawn as one, with the gaps named. */
+.procedure-coverage {
+  background: color-mix(in srgb, var(--amber) 8%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--amber) 30%, var(--line));
+  border-radius: 16px;
+  display: grid;
+  gap: 10px;
+  padding: 16px 18px;
+}
+
+.procedure-coverage.is-complete {
+  background: color-mix(in srgb, var(--mint) 8%, var(--surface));
+  border-color: color-mix(in srgb, var(--mint) 30%, var(--line));
+}
+
+.procedure-coverage-head {
+  align-items: baseline;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.procedure-coverage-head strong {
+  font-size: var(--type-supporting);
+  font-weight: 750;
+}
+
+.procedure-coverage-head b {
+  font-size: var(--type-card-title);
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+}
+
+.procedure-coverage-bar {
+  background: color-mix(in srgb, var(--ink) 9%, transparent);
+  border-radius: 999px;
+  display: block;
+  height: 8px;
+  overflow: hidden;
+}
+
+.procedure-coverage-bar i {
+  background: var(--amber);
+  border-radius: 999px;
+  display: block;
+  height: 100%;
+  transition: width .2s ease;
+}
+
+.procedure-coverage.is-complete .procedure-coverage-bar i {
+  background: var(--mint);
+}
+
+.procedure-coverage p {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+}
+
+.procedure-coverage p span {
+  color: var(--muted);
+  font-size: var(--type-compact);
+  font-weight: 650;
+}
+
+.procedure-coverage p b {
+  background: color-mix(in srgb, var(--amber) 14%, transparent);
+  border-radius: 999px;
+  color: var(--amber-ink);
+  font-size: var(--type-compact);
+  font-weight: 700;
+  padding: 3px 10px;
+}
+
 /* The working week, seven marks wide, so shifts compare down the column. */
 .week-strip {
   display: inline-flex;
@@ -9823,7 +9899,83 @@ button.row-action-link {
  */
 .checklist-register-head,
 .checklist-register-row {
-  grid-template-columns: minmax(200px, 2fr) minmax(100px, .7fr) minmax(130px, 1fr) 78px 96px 64px;
+  /* One column fewer: the category is the band heading now, not a cell. */
+  grid-template-columns: minmax(200px, 2fr) minmax(150px, 1.2fr) 90px 96px 70px;
+}
+
+/* A labelled band per category, so a long list reads as a handful of groups. */
+.checklist-group-head {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  margin: 0;
+  padding: 14px 20px 6px;
+}
+
+.checklist-group-head span {
+  color: var(--muted);
+  font-size: var(--type-label);
+  font-weight: 850;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.checklist-group-head b {
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: var(--type-compact);
+  font-weight: 700;
+  padding: 2px 9px;
+}
+
+.checklist-group + .checklist-group .checklist-group-head {
+  border-top: 1px solid var(--line);
+  margin-top: 4px;
+  padding-top: 16px;
+}
+
+.checklist-filter {
+  align-items: center;
+  display: flex;
+  flex: 1 1 240px;
+  max-width: 380px;
+  position: relative;
+}
+
+.checklist-filter svg {
+  color: var(--muted);
+  height: 15px;
+  left: 12px;
+  pointer-events: none;
+  position: absolute;
+  width: 15px;
+}
+
+.checklist-filter input {
+  background: var(--input-surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--type-supporting);
+  min-height: 38px;
+  outline: 0;
+  padding: 0 12px 0 34px;
+  width: 100%;
+}
+
+.checklist-filter input:focus {
+  border-color: var(--focus-ring);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus-ring) 26%, transparent);
+}
+
+.checklist-no-match {
+  color: var(--muted);
+  font-size: var(--type-supporting);
+  margin: 0;
+  padding: 24px 20px;
+  text-align: center;
 }
 
 .checklist-register-row.is-archived {

@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { Search } from "lucide-react";
+import { useActionState, useMemo, useState } from "react";
 
 import type { DocumentChecklistRow, MasterDataWorkspace } from "../../../lib/master-data/repository";
 import { type DocumentChecklistActionState } from "../../../lib/master-data/validation";
@@ -27,23 +28,49 @@ export default function ChecklistRegister({
   workspace: MasterDataWorkspace;
 }) {
   const [dialog, setDialog] = useState<DialogState<DocumentChecklistRow>>(null);
+  const [query, setQuery] = useState("");
   const [state, formAction, pending] = useActionState(saveChecklistItemAction, initialState);
   const toast = useToast();
   useCloseOnSuccess(pending, state, () => { toast.success("Checklist item saved."); setDialog(null); });
   const record = dialogRecord(dialog);
 
+  const term = query.trim().toLowerCase();
+  const matched = useMemo(
+    () => (term
+      ? workspace.checklist.filter((item) =>
+        `${item.name} ${item.code} ${item.category} ${item.serviceCode} ${item.serviceName ?? ""}`.toLowerCase().includes(term))
+      : workspace.checklist),
+    [term, workspace.checklist],
+  );
+  /*
+   * Grouped by the category the data already carries. A flat list of every
+   * document a firm asks for is a wall; the category is how people talk about
+   * them, and it was previously used only to fill a datalist.
+   */
+  const grouped = useMemo(() => Map.groupBy(matched, (item) => item.category || "Uncategorised"), [matched]);
+
   return (
     <>
       <section className="surface-card client-package-register">
-        {canManage && (
-          <div className="master-register-toolbar">
-            <div>
-              <strong>Documents needed</strong>
-              <small>Defined once here, then offered whenever a request is raised.</small>
-            </div>
-            <button className="primary-button" onClick={() => setDialog("add")} type="button">Add document</button>
+        <div className="master-register-toolbar">
+          <div>
+            <strong>Documents needed</strong>
+            <small>Defined once here, then offered whenever a request is raised.</small>
           </div>
-        )}
+          {workspace.checklist.length > 0 && (
+            <label className="checklist-filter">
+              <Search aria-hidden="true" />
+              <input
+                aria-label="Filter documents"
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Filter by name, code, category, or service…"
+                type="search"
+                value={query}
+              />
+            </label>
+          )}
+          {canManage && <button className="primary-button" onClick={() => setDialog("add")} type="button">Add document</button>}
+        </div>
 
         {workspace.checklist.length === 0 ? (
           <div className="package-empty-state">
@@ -53,9 +80,18 @@ export default function ChecklistRegister({
         ) : (
           <div>
             <div className="package-register-head checklist-register-head">
-              <span>Document</span><span>Category</span><span>Applies to</span><span>Lead</span><span>Status</span><span aria-hidden="true" />
+              <span>Document</span><span>Applies to</span><span>Lead</span><span>Status</span><span aria-hidden="true" />
             </div>
-            {workspace.checklist.map((item) => (
+            {matched.length === 0 && (
+              <p className="checklist-no-match">No document matches “{query.trim()}”.</p>
+            )}
+            {[...grouped.entries()].map(([category, items]) => (
+              <div className="checklist-group" key={category}>
+                <p className="checklist-group-head">
+                  <span>{category}</span>
+                  <b>{items.length}</b>
+                </p>
+                {items.map((item) => (
               <article className={`package-register-row checklist-register-row ${item.status === "archived" ? "is-archived" : ""}`} key={item.id}>
                 <span className="checklist-document-cell">
                   <b>
@@ -64,14 +100,15 @@ export default function ChecklistRegister({
                   </b>
                   <small title={item.instructions || item.code}>{item.code}{item.instructions ? ` · ${item.instructions}` : ""}</small>
                 </span>
-                <span>{item.category}</span>
                 <span>{item.serviceCode ? `${item.serviceCode}${item.serviceName ? ` · ${item.serviceName}` : ""}` : "Any service"}</span>
                 <span>{item.defaultLeadDays} day{item.defaultLeadDays === 1 ? "" : "s"}</span>
                 <StatusBadge tone={item.status === "archived" ? "neutral" : "mint"}>{item.status === "archived" ? "Archived" : "Active"}</StatusBadge>
                 {canManage
                   ? <button className="master-toggle-button" onClick={() => setDialog(item)} type="button">Edit</button>
                   : <span>View only</span>}
-              </article>
+                  </article>
+                ))}
+              </div>
             ))}
           </div>
         )}

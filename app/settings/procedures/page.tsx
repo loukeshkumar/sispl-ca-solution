@@ -11,6 +11,7 @@ import {
   servicesWithoutProcedure,
   type ProcedureStepRow,
 } from "../../../lib/procedures/repository";
+import { KpiCard } from "../../dashboard/dashboard-ui";
 import { ProcedureEditor } from "./procedure-editor";
 
 export const dynamic = "force-dynamic";
@@ -51,23 +52,35 @@ export default async function ProceduresPage() {
         </div>
       </header>
 
-      <section className="package-kpi-grid kpi-grid">
-        <article className="surface-card checklist-kpi">
-          <span>SERVICES COVERED</span><strong>{String(published.length).padStart(2, "0")}</strong>
-          <small>of {services.length} active services</small>
-        </article>
-        <article className="surface-card checklist-kpi">
-          <span>STEPS PUBLISHED</span><strong>{String(totalSteps).padStart(2, "0")}</strong>
-          <small>Across every live procedure</small>
-        </article>
-        <article className="surface-card checklist-kpi">
-          <span>DRAFTS</span><strong>{String(drafts.length).padStart(2, "0")}</strong>
-          <small>Not yet applied to any work</small>
-        </article>
-        <article className="surface-card checklist-kpi">
-          <span>UNCOVERED</span><strong>{String(uncovered.length).padStart(2, "0")}</strong>
-          <small>Progress still typed by hand</small>
-        </article>
+      <section className="kpi-grid">
+        <KpiCard
+          icon="compliance"
+          label="SERVICES COVERED"
+          note={`of ${services.length} active services`}
+          tone={uncovered.length === 0 ? "mint" : "amber"}
+          value={String(published.length).padStart(2, "0")}
+        />
+        <KpiCard
+          icon="review"
+          label="STEPS PUBLISHED"
+          note="Across every live procedure"
+          tone="blue"
+          value={String(totalSteps).padStart(2, "0")}
+        />
+        <KpiCard
+          icon="documents"
+          label="DRAFTS"
+          note="Not yet applied to any work"
+          tone={drafts.length ? "amber" : "blue"}
+          value={String(drafts.length).padStart(2, "0")}
+        />
+        <KpiCard
+          icon="alert"
+          label="UNCOVERED"
+          note="Progress still typed by hand"
+          tone={uncovered.length ? "red" : "mint"}
+          value={String(uncovered.length).padStart(2, "0")}
+        />
       </section>
 
       <ProcedureEditor
