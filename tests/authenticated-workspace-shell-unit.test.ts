@@ -11,7 +11,9 @@ test("authenticated feature routes inherit the persistent application shell", as
     read("app/work/layout.tsx"),
     read("app/documents/layout.tsx"),
     read("app/tasks/layout.tsx"),
-    read("app/team/layout.tsx"),
+    // Each /team route frames itself, so the employee record carries the
+    // Employees highlight rather than a parent that would claim it for all.
+    read("app/team/[employeeId]/layout.tsx"),
   ]);
 
   assert.match(shell, /DashboardShell/);

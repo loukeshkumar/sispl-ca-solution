@@ -5,9 +5,35 @@ import test from "node:test";
 const read = (path: string) => readFile(new URL(path, import.meta.url), "utf8");
 
 /**
- * A settings route renders its own `<main>`, so the sidebar and command bar can
- * only come from a layout. Four routes shipped without one and rendered as a
- * bare page, which is invisible until someone opens that URL.
+ * A route with an href in the sidebar renders its own `<main>`, so the shell
+ * and the highlight can only come from a layout. Two ways this has gone wrong:
+ * four settings routes shipped with no frame at all and lost the sidebar, and
+ * every route under /team inherited one parent frame saying "Employees", so
+ * Training & CPE highlighted the wrong item.
+ */
+test("every routed sidebar destination mounts a frame that names it", async () => {
+  const shell = await read("../app/dashboard/dashboard-shell.tsx");
+  const navLabels = new Set([...shell.matchAll(/label: "([^"]+)"/g)].map((match) => match[1]));
+  const destinations = [...shell.matchAll(/href: "(\/[^"]+)", icon: "[^"]+", label: "([^"]+)"/g)]
+    .map((match) => ({ href: match[1], label: match[2] }));
+  assert.ok(destinations.length >= 8, `expected the routed destinations to be found, got ${destinations.length}`);
+
+  for (const destination of destinations) {
+    const layout = await read(`../app${destination.href}/layout.tsx`).catch(() => "");
+    const active = /WorkspaceRouteFrame active="([^"]+)"/.exec(layout);
+    assert.ok(active, `${destination.href} has no WorkspaceRouteFrame layout of its own`);
+    assert.equal(
+      active[1],
+      destination.label,
+      `${destination.href} highlights "${active[1]}" but the sidebar links it as "${destination.label}"`,
+    );
+    assert.ok(navLabels.has(active[1]), `"${active[1]}" is not a sidebar destination`);
+  }
+});
+
+/**
+ * Every settings route needs a frame, including the ones the sidebar does not
+ * link to directly.
  */
 test("every settings route renders inside the workspace frame", async () => {
   const settings = new URL("../app/settings/", import.meta.url);
@@ -19,16 +45,26 @@ test("every settings route renders inside the workspace frame", async () => {
   }
   assert.ok(routes.length >= 7, "expected the settings routes to be discovered");
 
-  const shell = await read("../app/dashboard/dashboard-shell.tsx");
-  const navLabels = new Set([...shell.matchAll(/label: "([^"]+)"/g)].map((match) => match[1]));
+  const shellSource = await read("../app/dashboard/dashboard-shell.tsx");
+  const labels = new Set([...shellSource.matchAll(/label: "([^"]+)"/g)].map((match) => match[1]));
 
   for (const route of routes) {
     const layout = await read(`../app/settings/${route}/layout.tsx`).catch(() => "");
     const active = /WorkspaceRouteFrame active="([^"]+)"/.exec(layout);
     assert.ok(active, `app/settings/${route} has no WorkspaceRouteFrame layout, so it loses the sidebar`);
-    assert.ok(navLabels.has(active[1]), `"${active[1]}" is not a sidebar destination, so ${route} highlights nothing`);
+    assert.ok(labels.has(active[1]), `"${active[1]}" is not a sidebar destination, so ${route} highlights nothing`);
   }
 });
+
+/**
+ * A parent frame would wrap every child route with one label and nest a second
+ * shell inside any child that mounts its own.
+ */
+test("a parent layout over routed destinations stays a pass-through", async () => {
+  const teamLayout = await read("../app/team/layout.tsx");
+  assert.doesNotMatch(teamLayout, /WorkspaceRouteFrame/, "app/team/layout.tsx must not frame every team route");
+});
+
 
 /**
  * The sidebar renders a page destination as a link, but the palette and the `g`

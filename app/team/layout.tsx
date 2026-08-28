@@ -1,7 +1,11 @@
 import type { ReactNode } from "react";
 
-import WorkspaceRouteFrame from "../workspace-route-frame";
-
-export default function EmployeesLayout({ children }: { children: ReactNode }) {
-  return <WorkspaceRouteFrame active="Employees">{children}</WorkspaceRouteFrame>;
+/**
+ * Pass-through. Each route under /team mounts its own frame so it can name
+ * itself in the sidebar; a frame here would wrap them all as "Employees" and
+ * highlight the wrong item, and nesting a second frame inside it would render
+ * the shell twice.
+ */
+export default function TeamLayout({ children }: { children: ReactNode }) {
+  return children;
 }
