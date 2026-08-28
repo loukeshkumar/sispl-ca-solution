@@ -11,7 +11,7 @@ import { formatPaise } from "../../../lib/payroll/money";
 import { getSalaryStructureEditorData } from "../../../lib/payroll/repository";
 import { getEmployee360 } from "../../../lib/team/repository";
 import { taskStatusLabel } from "../../../lib/tasks/validation";
-import { EmptyState, InitialsAvatar, StatusBadge } from "../../dashboard/dashboard-ui";
+import { EmptyState, InitialsAvatar, KpiCard, StatusBadge } from "../../dashboard/dashboard-ui";
 import { ProvisionAccess } from "./employee-actions";
 import { EmploymentPanel } from "./employment-panel";
 import { getActiveBankAccount } from "../../../lib/payroll/bank-accounts";
@@ -23,6 +23,9 @@ import { probationOverdue } from "../../../lib/team/offboarding";
 import { trainingEvidenceFor } from "../../../lib/training/repository";
 import { buildExitClearance } from "../../../lib/team/offboarding-repository";
 import { indiaDateKey } from "../../../lib/attendance/calculations";
+import { listEmployeeActivity } from "../../../lib/team/repository";
+import { WorkspaceTabs } from "../../dashboard/workspace-tabs";
+import { ActivityTimeline } from "./activity-timeline";
 
 export const dynamic = "force-dynamic";
 
@@ -38,7 +41,7 @@ export default async function Employee360Page({ params, searchParams }: { params
   const canManage = hasPermission(session, "team:manage");
   const canReviewAttendance = hasPermission(session, "attendance:review");
   const canManageSalary = hasPermission(session, "salary:manage");
-  const [attendanceWorkspace, salaryData, bankAccount, capabilities, capabilityServices, trainingEvidence, clearance] = await Promise.all([
+  const [attendanceWorkspace, salaryData, bankAccount, capabilities, capabilityServices, trainingEvidence, clearance, activity] = await Promise.all([
     canReviewAttendance ? getAttendanceWorkspace(database, session.tenantId, session.userId, session.roleKey as Role).catch(() => null) : Promise.resolve(null),
     canManageSalary ? getSalaryStructureEditorData(database, session.tenantId, session.userId, employee.userId) : Promise.resolve(null),
     canManageSalary ? loadOptionalPanel("bank-account", () => getActiveBankAccount(database, session.tenantId, employee.userId), null) : Promise.resolve(null),
@@ -50,11 +53,21 @@ export default async function Employee360Page({ params, searchParams }: { params
     employee.status === "active"
       ? buildExitClearance(database, session.tenantId, employee.userId, indiaDateKey()).catch(() => null)
       : Promise.resolve(null),
+    listEmployeeActivity(database, session.tenantId, employee.id).catch(() => []),
   ]);
   const attendanceSummary = attendanceWorkspace?.team.find((member) => member.userId === employee.userId) ?? null;
   const monthlyGrossPaise = salaryData?.current?.lines.filter((line) => line.kind === "earning").reduce((sum, line) => sum + line.monthlyAmountPaise, 0) ?? null;
   const disableError = (await searchParams).disableError;
   const todayKey = indiaDateKey();
+  // Months rather than a date difference: "1y 4m" answers the question a date
+  // makes the reader work out.
+  const tenureMonths = Math.max(0, Math.round(
+    (Date.parse(`${employee.employmentEndDate ?? todayKey}T00:00:00Z`) - Date.parse(`${employee.joiningDate}T00:00:00Z`))
+    / (1000 * 60 * 60 * 24 * 30.44),
+  ));
+  const tenure = tenureMonths < 12
+    ? `${tenureMonths} month${tenureMonths === 1 ? "" : "s"}`
+    : `${Math.floor(tenureMonths / 12)}y ${tenureMonths % 12}m`;
 
   return (
     <main className="employee-360-shell">
@@ -72,57 +85,126 @@ export default async function Employee360Page({ params, searchParams }: { params
       {disableError === "active-tasks" && <p className="client-form-banner" role="alert">Reassign or close this employee&apos;s active tasks before disabling access.</p>}
       {disableError === "failed" && <p className="client-form-banner" role="alert">The employee could not be disabled. Review their account and try again.</p>}
 
+      <section className="kpi-grid employee-360-kpis">
+        <KpiCard
+          icon="work"
+          label="OPEN WORK"
+          note={`${employee.tasks.length} task${employee.tasks.length === 1 ? "" : "s"} on file`}
+          tone={employee.overdueTaskCount ? "amber" : "blue"}
+          value={String(employee.activeTaskCount).padStart(2, "0")}
+        />
+        <KpiCard
+          icon="alert"
+          label="OVERDUE"
+          note="Past their due date"
+          tone={employee.overdueTaskCount ? "red" : "mint"}
+          value={String(employee.overdueTaskCount).padStart(2, "0")}
+        />
+        <KpiCard
+          icon="team"
+          label="TENURE"
+          note={`Joined ${formatDate(employee.joiningDate)}`}
+          tone="blue"
+          value={tenure}
+        />
+        <KpiCard
+          icon="settings"
+          label="ACCESS"
+          note={employee.mustChangePassword ? "Temporary password active" : employee.loginEnabled ? "Signs in normally" : "No login provisioned"}
+          tone={employee.status !== "active" ? "red" : employee.loginEnabled ? "mint" : "amber"}
+          value={employee.status !== "active" ? "Off" : employee.loginEnabled ? "On" : "None"}
+        />
+      </section>
+
       <section className="employee-360-grid">
         <article className="surface-card employee-360-main">
           <div className="employee-overview-heading"><div><p className="eyebrow">EMPLOYMENT PROFILE</p><h2>{employee.designation}</h2></div><StatusBadge tone={employee.status === "active" ? "mint" : "red"}>{employee.status === "active" ? "Active" : "Disabled"}</StatusBadge></div>
-          <div className="client-360-detail-grid employee-detail-grid">
-            <div><span>Employee code</span><strong>{employee.employeeCode}</strong></div>
-            <div><span>User role</span><strong>{employee.roleName}</strong><small>{accessClassLabel(employee.accessClass)}</small></div>
-            <div><span>Email</span><strong>{employee.email}</strong></div>
-            <div><span>Mobile</span><strong>{employee.mobileNumber || "Not recorded"}</strong></div>
-            <div><span>Joining date</span><strong>{formatDate(employee.joiningDate)}</strong></div>
-            <div><span>{employee.employmentEndDate ? "Employment ended" : "Open workload"}</span><strong>{employee.employmentEndDate ? formatDate(employee.employmentEndDate) : `${employee.activeTaskCount} tasks`}</strong></div>
-          </div>
-          <EmploymentPanel
-            canManage={canManage && employee.accessClass !== "super_admin"}
-            clearance={clearance}
-            employee={{
-              confirmedOn: employee.confirmedOn,
-              employmentEndDate: employee.employmentEndDate,
-              employmentStage: employee.employmentStage,
-              exitReason: employee.exitReason,
-              id: employee.id,
-              joiningDate: employee.joiningDate,
-              name: employee.fullName,
-              noticeStartDate: employee.noticeStartDate,
-              probationEndDate: employee.probationEndDate,
-            }}
-            probationDue={probationOverdue(employee.employmentStage, employee.probationEndDate, todayKey)}
-            todayKey={todayKey}
+          <WorkspaceTabs
+            ariaLabel="Employee views"
+            tabs={[
+              {
+                content: (
+                  <>
+                    <div className="client-360-detail-grid employee-detail-grid">
+                      <div><span>Employee code</span><strong>{employee.employeeCode}</strong></div>
+                      <div><span>User role</span><strong>{employee.roleName}</strong><small>{accessClassLabel(employee.accessClass)}</small></div>
+                      <div><span>Email</span><strong>{employee.email}</strong></div>
+                      <div><span>Mobile</span><strong>{employee.mobileNumber || "Not recorded"}</strong></div>
+                      <div><span>Joining date</span><strong>{formatDate(employee.joiningDate)}</strong></div>
+                      <div><span>{employee.employmentEndDate ? "Employment ended" : "Open workload"}</span><strong>{employee.employmentEndDate ? formatDate(employee.employmentEndDate) : `${employee.activeTaskCount} tasks`}</strong></div>
+                    </div>
+                    <EmploymentPanel
+                      canManage={canManage && employee.accessClass !== "super_admin"}
+                      clearance={clearance}
+                      employee={{
+                        confirmedOn: employee.confirmedOn,
+                        employmentEndDate: employee.employmentEndDate,
+                        employmentStage: employee.employmentStage,
+                        exitReason: employee.exitReason,
+                        id: employee.id,
+                        joiningDate: employee.joiningDate,
+                        name: employee.fullName,
+                        noticeStartDate: employee.noticeStartDate,
+                        probationEndDate: employee.probationEndDate,
+                      }}
+                      probationDue={probationOverdue(employee.employmentStage, employee.probationEndDate, todayKey)}
+                      todayKey={todayKey}
+                    />
+                    {employee.notes && <section className="employee-notes"><p className="eyebrow">INTERNAL NOTES</p><p>{employee.notes}</p></section>}
+                  </>
+                ),
+                id: "profile",
+                label: "Profile",
+              },
+              {
+                content: (
+                  <CapabilityPanel
+                    canManage={canManage}
+                    capabilities={capabilities}
+                    employeeUserId={employee.userId}
+                    evidence={Object.fromEntries(trainingEvidence)}
+                    isSelf={employee.userId === session.userId}
+                    services={capabilityServices}
+                  />
+                ),
+                id: "capability",
+                label: "Capability",
+              },
+              {
+                badge: employee.tasks.length,
+                content: (
+                  <section className="employee-task-register">
+                    <div className="employee-overview-heading"><div><p className="eyebrow">ASSIGNED WORK</p><h2>Task register</h2></div><span>{employee.tasks.length} total</span></div>
+                    <div className="employee-task-list">
+                      {employee.tasks.map((task) => <Link href={`/tasks/${task.id}`} key={task.id}><span><strong>{task.title}</strong><small>{task.priority} priority · Due {formatDate(task.dueDate)}</small></span><StatusBadge tone={statusTone(task.status)}>{taskStatusLabel(task.status)}</StatusBadge></Link>)}
+                      {!employee.tasks.length && <EmptyState description="Delivery work assigned to this employee appears here." icon="work" title="No tasks assigned" />}
+                    </div>
+                  </section>
+                ),
+                id: "work",
+                label: "Work",
+              },
+              {
+                content: (
+                  <>
+                    {(attendanceSummary || canManageSalary) && <section className="employee-people-operations">
+                      {attendanceSummary && <article><div><p className="eyebrow">ATTENDANCE</p><h3>Attendance overview</h3><span>Current monthly exception view</span></div><dl><div><dt>Present days</dt><dd>{attendanceSummary.presentDays}</dd></div><div><dt>Exceptions</dt><dd>{attendanceSummary.exceptionCount}</dd></div></dl><Link href="/?workspace=attendance">Open attendance</Link></article>}
+                      {canManageSalary && <article><div><p className="eyebrow">CONFIDENTIAL PAYROLL</p><h3>Salary structure</h3><span>{salaryData?.current ? `Effective ${salaryData.current.effectiveFrom}` : "Not configured"}</span></div><dl><div><dt>Monthly gross</dt><dd>{monthlyGrossPaise === null ? "—" : formatPaise(monthlyGrossPaise)}</dd></div><div><dt>Components</dt><dd>{salaryData?.current?.lines.length ?? 0}</dd></div></dl><Link href={`/salary/structures/${employee.userId}`}>{salaryData?.current ? "Create new version" : "Configure salary"}</Link></article>}
+                    </section>}
+                    {canManageSalary && <BankAccountPanel account={bankAccount} canManage employeeId={employee.id} employeeUserId={employee.userId} />}
+                  </>
+                ),
+                id: "people",
+                label: "People ops",
+              },
+              {
+                badge: activity.length,
+                content: <ActivityTimeline entries={activity} />,
+                id: "history",
+                label: "History",
+              },
+            ]}
           />
-          <CapabilityPanel
-            canManage={canManage}
-            capabilities={capabilities}
-            employeeUserId={employee.userId}
-            evidence={Object.fromEntries(trainingEvidence)}
-            isSelf={employee.userId === session.userId}
-            services={capabilityServices}
-          />
-          {canManageSalary && <BankAccountPanel account={bankAccount} canManage employeeId={employee.id} employeeUserId={employee.userId} />}
-          {employee.notes && <section className="employee-notes"><p className="eyebrow">INTERNAL NOTES</p><p>{employee.notes}</p></section>}
-
-          {(attendanceSummary || canManageSalary) && <section className="employee-people-operations">
-            {attendanceSummary && <article><div><p className="eyebrow">ATTENDANCE</p><h3>Attendance overview</h3><span>Current monthly exception view</span></div><dl><div><dt>Present days</dt><dd>{attendanceSummary.presentDays}</dd></div><div><dt>Exceptions</dt><dd>{attendanceSummary.exceptionCount}</dd></div></dl><Link href="/?workspace=attendance">Open attendance</Link></article>}
-            {canManageSalary && <article><div><p className="eyebrow">CONFIDENTIAL PAYROLL</p><h3>Salary structure</h3><span>{salaryData?.current ? `Effective ${salaryData.current.effectiveFrom}` : "Not configured"}</span></div><dl><div><dt>Monthly gross</dt><dd>{monthlyGrossPaise === null ? "—" : formatPaise(monthlyGrossPaise)}</dd></div><div><dt>Components</dt><dd>{salaryData?.current?.lines.length ?? 0}</dd></div></dl><Link href={`/salary/structures/${employee.userId}`}>{salaryData?.current ? "Create new version" : "Configure salary"}</Link></article>}
-          </section>}
-
-          <section className="employee-task-register">
-            <div className="employee-overview-heading"><div><p className="eyebrow">ASSIGNED WORK</p><h2>Task register</h2></div><span>{employee.tasks.length} total</span></div>
-            <div className="employee-task-list">
-              {employee.tasks.map((task) => <Link href={`/tasks/${task.id}`} key={task.id}><span><strong>{task.title}</strong><small>{task.priority} priority · Due {formatDate(task.dueDate)}</small></span><StatusBadge tone={statusTone(task.status)}>{taskStatusLabel(task.status)}</StatusBadge></Link>)}
-              {!employee.tasks.length && <EmptyState description="Delivery work assigned to this employee appears here." icon="work" title="No tasks assigned" />}
-            </div>
-          </section>
         </article>
 
         <aside className="surface-card employee-access-card">

@@ -9330,6 +9330,73 @@ button.row-action-link {
 }
 
 
+/* ---- Employee 360: summary strip and history --------------------------- */
+
+.employee-360-kpis {
+  margin-bottom: 4px;
+}
+
+.employee-activity {
+  display: grid;
+  gap: 14px;
+}
+
+/*
+ * A rail with a mark per event. The colour says what kind of change it was —
+ * access, employment stage, or the record ending — so a long history can be
+ * skimmed for the moments that matter rather than read line by line.
+ */
+.activity-list {
+  border-left: 1px solid var(--line);
+  display: grid;
+  gap: 2px;
+  list-style: none;
+  margin: 0 0 0 7px;
+  padding: 4px 0 4px 20px;
+}
+
+.activity-entry {
+  padding: 8px 0;
+  position: relative;
+}
+
+.activity-marker {
+  background: var(--surface);
+  border: 2px solid color-mix(in srgb, var(--ink) 26%, transparent);
+  border-radius: 50%;
+  height: 11px;
+  left: -26px;
+  position: absolute;
+  top: 13px;
+  width: 11px;
+}
+
+.activity-entry.is-created .activity-marker { border-color: var(--mint); }
+.activity-entry.is-access .activity-marker { border-color: var(--accent); }
+.activity-entry.is-stage .activity-marker { border-color: var(--blue); }
+.activity-entry.is-exit .activity-marker { border-color: var(--red); }
+
+.activity-entry > div {
+  display: grid;
+  gap: 2px;
+}
+
+.activity-entry strong {
+  font-size: var(--type-supporting);
+  font-weight: 750;
+}
+
+.activity-entry em {
+  color: var(--ink);
+  font-size: var(--type-compact);
+  font-style: normal;
+}
+
+.activity-entry small {
+  color: var(--muted);
+  font-size: var(--type-compact);
+}
+
 /* Procedure coverage: a ratio drawn as one, with the gaps named. */
 .procedure-coverage {
   background: color-mix(in srgb, var(--amber) 8%, var(--surface));

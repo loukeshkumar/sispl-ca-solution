@@ -242,6 +242,45 @@ export async function updateEmployee(database: DashboardDatabase, tenantId: stri
   });
 }
 
+export type EmployeeActivityEntry = {
+  action: string;
+  actorName: string | null;
+  id: string;
+  occurredAt: Date;
+  reason: string | null;
+};
+
+/**
+ * What has been done to this employee's record, and by whom.
+ *
+ * Every mutation in this file already writes an audit event; nothing ever read
+ * them back, so the record existed and was invisible. Ordered newest first and
+ * capped, because a long-serving employee accumulates more than anyone reads.
+ */
+export async function listEmployeeActivity(
+  database: DashboardDatabase,
+  tenantId: string,
+  employeeId: string,
+  limit = 40,
+): Promise<EmployeeActivityEntry[]> {
+  const rows = await database.select({
+    action: auditEvents.action,
+    actorName: users.fullName,
+    id: auditEvents.id,
+    occurredAt: auditEvents.occurredAt,
+    reason: auditEvents.reason,
+  }).from(auditEvents)
+    .leftJoin(users, eq(users.id, auditEvents.actorUserId))
+    .where(and(
+      eq(auditEvents.tenantId, tenantId),
+      eq(auditEvents.resourceType, "employee"),
+      eq(auditEvents.resourceId, employeeId),
+    ))
+    .orderBy(desc(auditEvents.occurredAt))
+    .limit(limit);
+  return rows;
+}
+
 export async function provisionEmployeeAccess(database: DashboardDatabase, tenantId: string, actorUserId: string, employeeId: string) {
   const temporaryPassword = createTemporaryPassword();
   const passwordHash = await hashPassword(temporaryPassword);
