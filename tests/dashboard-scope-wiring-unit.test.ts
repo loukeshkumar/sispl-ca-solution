@@ -34,6 +34,6 @@ test("a team scope with no reports explains itself instead of looking broken", a
   assert.match(overview, /data\.scope\?\.kind === "team" && !data\.scope\.hasReports/);
   assert.match(overview, /reporting lines/i);
   // The explanation has to lead somewhere the reader can act.
-  assert.match(overview, /href="\/\?workspace=team"/);
+  assert.match(overview, /href="\/\?workspace=attendance"/);
   assert.match(css, /\.scope-notice \{/);
 });

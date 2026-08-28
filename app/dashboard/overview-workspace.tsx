@@ -144,7 +144,8 @@ export function OverviewWorkspace({
         <p className="scope-notice" role="status">
           This dashboard covers you and your direct reports, and nobody reports to you yet.
           {" "}
-          <Link href="/?workspace=team">Set reporting lines in Employees</Link> to see your team&rsquo;s work here.
+          An administrator sets reporting lines on each employee&rsquo;s work profile, under{" "}
+          <Link href="/?workspace=attendance">Attendance &rarr; Setup</Link>.
         </p>
       )}
       <OverviewKpis data={data} filter={filter} onFilterChange={onFilterChange} onOpenMyWork={onOpenMyWork} />
