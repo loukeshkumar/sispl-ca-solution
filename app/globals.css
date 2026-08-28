@@ -8410,7 +8410,9 @@ button.kpi-card[aria-pressed="true"] {
 
 .holiday-register-head,
 .holiday-register-row {
-  grid-template-columns: 112px minmax(160px, 1.7fr) minmax(94px, .7fr) minmax(100px, .8fr) 92px 132px;
+  /* The date cell now carries the weekday under it, so a fixed 112px forced
+     that line to wrap while the name column held 500px of nothing. */
+  grid-template-columns: minmax(150px, 1fr) minmax(160px, 1.4fr) minmax(94px, .7fr) minmax(100px, .8fr) 92px 132px;
 }
 
 .shift-register-head,
@@ -9327,6 +9329,30 @@ button.row-action-link {
   }
 }
 
+
+/* The working week, seven marks wide, so shifts compare down the column. */
+.week-strip {
+  display: inline-flex;
+  gap: 3px;
+}
+
+.week-strip b {
+  align-items: center;
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+  border-radius: 6px;
+  color: var(--muted);
+  display: flex;
+  font-size: var(--type-compact);
+  font-weight: 750;
+  height: 24px;
+  justify-content: center;
+  width: 24px;
+}
+
+.week-strip b.is-on {
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+  color: var(--amber-ink);
+}
 
 /* ---- Utilisation attainment ------------------------------------------- */
 

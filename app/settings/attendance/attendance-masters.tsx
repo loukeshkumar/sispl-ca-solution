@@ -28,6 +28,34 @@ const leaveInitial: LeaveTypeActionState = { error: "", fieldErrors: {} };
 const holidayInitial: HolidayActionState = { error: "", fieldErrors: {} };
 const shiftInitial: ShiftTypeActionState = { error: "", fieldErrors: {} };
 
+const WEEK_INITIALS = ["M", "T", "W", "T", "F", "S", "S"];
+
+const formatHoliday = (value: string) => new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeZone: "UTC" })
+  .format(new Date(`${value}T00:00:00Z`));
+
+const weekdayOf = (value: string) => new Intl.DateTimeFormat("en-IN", { timeZone: "UTC", weekday: "long" })
+  .format(new Date(`${value}T00:00:00Z`));
+
+/** Monday-first, matching the seven-character working-week mask. */
+const weekIndexOf = (value: string) => (new Date(`${value}T00:00:00Z`).getUTCDay() + 6) % 7;
+
+/**
+ * The working week as seven marks rather than a sentence.
+ *
+ * The prose stays as the accessible name, so a screen reader still hears
+ * "Mon, Tue, Wed, Thu, Fri" while the eye gets a shape it can compare down
+ * the column.
+ */
+function WorkingWeek({ mask }: { mask: string }) {
+  return (
+    <span aria-label={describeWorkingWeek(mask)} className="week-strip" role="img">
+      {WEEK_INITIALS.map((initial, index) => (
+        <b className={mask[index] === "1" ? "is-on" : ""} key={index}>{initial}</b>
+      ))}
+    </span>
+  );
+}
+
 const holidayTypeLabels: Record<string, string> = { public: "Public", restricted: "Restricted", optional: "Optional" };
 const WEEK_DAYS = [["Mon", 0], ["Tue", 1], ["Wed", 2], ["Thu", 3], ["Fri", 4], ["Sat", 5], ["Sun", 6]] as const;
 
@@ -131,6 +159,15 @@ export default function AttendanceMasters({
   const [leaveDialog, setLeaveDialog] = useState<DialogState<LeaveTypeRow>>(null);
   const [holidayDialog, setHolidayDialog] = useState<DialogState<HolidayRow>>(null);
   const [shiftDialog, setShiftDialog] = useState<DialogState<ShiftTypeRow>>(null);
+  /*
+   * A holiday that lands on a day the firm is already closed costs nothing and
+   * gains nobody a day off, which is worth saying on the row. Only the default
+   * shift can answer that; without one the claim would be a guess, so it is
+   * left unsaid.
+   */
+  const defaultWeekMask = workspace.shifts
+    .find((shift) => shift.isDefault && shift.status === "active")?.workingWeekMask ?? null;
+
   const [leaveState, leaveAction, leavePending] = useActionState(saveLeaveTypeAction, leaveInitial);
   const [holidayState, holidayAction, holidayPending] = useActionState(saveHolidayAction, holidayInitial);
   const [shiftState, shiftAction, shiftPending] = useActionState(saveShiftTypeAction, shiftInitial);
@@ -194,7 +231,13 @@ export default function AttendanceMasters({
               <div className="package-register-head holiday-register-head"><span>Date</span><span>Holiday</span><span>Type</span><span>State</span><span>Status</span><span aria-hidden="true" /></div>
               {workspace.holidays.map((item) => (
                 <article className={`package-register-row holiday-register-row ${item.holidayDate < workspace.todayKey ? "is-past" : ""}`} key={item.id}>
-                  <span><strong>{item.holidayDate}</strong></span>
+                  <span>
+                    <strong>{formatHoliday(item.holidayDate)}</strong>
+                    <small>
+                      {weekdayOf(item.holidayDate)}
+                      {defaultWeekMask && defaultWeekMask[weekIndexOf(item.holidayDate)] === "0" && " · already a non-working day"}
+                    </small>
+                  </span>
                   <span><strong>{item.name}</strong></span>
                   <span>{holidayTypeLabels[item.holidayType] ?? item.holidayType}</span>
                   <span>{item.jurisdictionState}</span>
@@ -222,7 +265,7 @@ export default function AttendanceMasters({
                     <small>{item.code}</small>
                   </span>
                   <span>{item.startTime} – {item.endTime}<small> · {item.lateGraceMinutes}m grace</small></span>
-                  <span>{describeWorkingWeek(item.workingWeekMask)}</span>
+                  <span><WorkingWeek mask={item.workingWeekMask} /></span>
                   <span>{Math.round(item.fullDayMinutes / 60 * 10) / 10}h / {Math.round(item.halfDayMinutes / 60 * 10) / 10}h</span>
                   <StatusBadge tone={item.status === "active" ? "mint" : "neutral"}>{item.status === "active" ? "Active" : "Archived"}</StatusBadge>
                   {canManage ? <RowActions kind="shift" onEdit={() => setShiftDialog(item)} recordId={item.id} status={item.status} /> : <span />}

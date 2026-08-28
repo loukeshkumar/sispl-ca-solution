@@ -4,6 +4,7 @@ import { hasPermission } from "../../../lib/auth/authorization";
 import { requirePermission } from "../../../lib/auth/server";
 import { getDatabase } from "../../../lib/dashboard/postgres/pool";
 import { listAttendanceMasters } from "../../../lib/attendance-masters/repository";
+import { KpiCard } from "../../dashboard/dashboard-ui";
 import AttendanceMasters from "./attendance-masters";
 
 export const dynamic = "force-dynamic";
@@ -31,10 +32,28 @@ export default async function AttendanceMastersPage({ searchParams }: { searchPa
       {query.saved === "1" && <p className="package-form-banner schedule-saved-banner" role="status">The master record was saved and applies to attendance from now on.</p>}
       {query.masterError === "1" && <p className="package-form-banner" role="alert">That record could not be updated. Refresh and try again.</p>}
 
-      <section className="package-kpi-grid kpi-grid">
-        <article className="surface-card checklist-kpi"><span>ACTIVE LEAVE TYPES</span><strong>{String(workspace.metrics.activeLeaveTypes).padStart(2, "0")}</strong><small>Offered on the leave request form</small></article>
-        <article className="surface-card checklist-kpi"><span>UPCOMING HOLIDAYS</span><strong>{String(workspace.metrics.upcomingHolidays).padStart(2, "0")}</strong><small>From {workspace.todayKey} onward</small></article>
-        <article className="surface-card checklist-kpi"><span>ACTIVE SHIFTS</span><strong>{String(workspace.metrics.activeShifts).padStart(2, "0")}</strong><small>Assignable to employees</small></article>
+      <section className="kpi-grid">
+        <KpiCard
+          icon="calendar"
+          label="ACTIVE LEAVE TYPES"
+          note="Offered on the leave request form"
+          tone={workspace.metrics.activeLeaveTypes ? "blue" : "amber"}
+          value={String(workspace.metrics.activeLeaveTypes).padStart(2, "0")}
+        />
+        <KpiCard
+          icon="calendar"
+          label="UPCOMING HOLIDAYS"
+          note={`From ${workspace.todayKey} onward`}
+          tone="mint"
+          value={String(workspace.metrics.upcomingHolidays).padStart(2, "0")}
+        />
+        <KpiCard
+          icon="clock"
+          label="ACTIVE SHIFTS"
+          note="Assignable to employees"
+          tone={workspace.metrics.activeShifts ? "blue" : "amber"}
+          value={String(workspace.metrics.activeShifts).padStart(2, "0")}
+        />
       </section>
 
       <AttendanceMasters canManage={canManage} initialTab={initialTab} workspace={workspace} />
