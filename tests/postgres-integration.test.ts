@@ -16,8 +16,7 @@ import { PasswordChangeError } from "../lib/auth/repository";
 import { createSessionToken, hashSessionToken } from "../lib/auth/tokens";
 import { archiveClient, ClientRepositoryError, createClient, getClient360Data, updateClient } from "../lib/clients/repository";
 import { SEEDED_TENANT_ID } from "../lib/dashboard/fixtures";
-import { FIRM_SCOPE } from "../lib/dashboard/scope";
-import { listDirectReports } from "../lib/dashboard/scope";
+import { FIRM_SCOPE, listDirectReports } from "../lib/dashboard/scope";
 import { applyBulkRequestCancel, cancelDocumentRequest, createDocumentRequest, getDocumentMetadata, listDocumentWorkspace, recordDocumentUpload } from "../lib/documents/repository";
 import { mapDashboardRecords } from "../lib/dashboard/mapper";
 import { closePostgresPool, getDatabase, getPostgresPool } from "../lib/dashboard/postgres/pool";
@@ -745,6 +744,46 @@ test("dashboard records narrow to the scope they are loaded with", async () => {
 
   // The members list is not scoped: it supplies names, not business data.
   assert.equal(own.members.length, firm.members.length);
+
+  // No seeded work item has a reviewer, so the reviewer arm of
+  // scopedWorkFilter is never otherwise exercised: an own scope must also see
+  // work the viewer only reviews, not just work they are assigned. Plant one,
+  // reusing an existing entity and an existing member so no client graph or
+  // new user is needed.
+  const existingWorkItems = await database.select({ id: workItems.id, legalEntityId: workItems.legalEntityId, assigneeId: workItems.assigneeId })
+    .from(workItems).where(eq(workItems.tenantId, identity.tenantId));
+  assert.ok(existingWorkItems.length > 0);
+  const reviewerUserId = identity.userId;
+  // An item reviewerUserId is not already tied to, to prove their own scope
+  // stays narrow and does not simply return everything.
+  const unrelatedItem = existingWorkItems.find((item) => item.assigneeId !== reviewerUserId);
+  assert.ok(unrelatedItem, "need an existing item the reviewer fixture is not already assigned to");
+
+  const reviewFixtureId = randomUUID();
+  await database.insert(workItems).values({
+    id: reviewFixtureId,
+    tenantId: identity.tenantId,
+    legalEntityId: existingWorkItems[0]!.legalEntityId,
+    serviceKey: "scope-test-review-service",
+    periodKey: "scope-test-review-period",
+    status: "at_risk",
+    statutoryDueDate: "2031-01-01",
+    assigneeId: null,
+    reviewerId: reviewerUserId,
+  });
+  try {
+    const reviewerScope = await loadDashboardRecords(database, identity.tenantId, { kind: "own", userId: reviewerUserId });
+    assert.ok(
+      reviewerScope.workItems.some((item) => item.id === reviewFixtureId),
+      "own scope must include work the viewer only reviews",
+    );
+    assert.ok(
+      !reviewerScope.workItems.some((item) => item.id === unrelatedItem!.id),
+      "own scope must not include work the viewer neither owns nor reviews",
+    );
+  } finally {
+    await database.delete(workItems).where(eq(workItems.id, reviewFixtureId));
+  }
 });
 
 test("employee disabling and task assignment serialize on the membership boundary", async () => {
