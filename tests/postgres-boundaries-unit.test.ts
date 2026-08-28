@@ -5,6 +5,7 @@ import { demoDashboardRecords, SEEDED_TENANT_ID, SEEDED_TENANT_SLUG } from "../l
 import { getPostgresDashboardData, getPostgresDashboardDataForTenant } from "../lib/dashboard/postgres/provider";
 import { findTenantIdBySlug, loadDashboardRecords } from "../lib/dashboard/postgres/repository";
 import { resolveTestDatabaseUrl } from "../lib/dashboard/postgres/test-config";
+import { FIRM_SCOPE } from "../lib/dashboard/scope";
 
 test("integration database URLs are isolated from the development database", () => {
   const derived = new URL(resolveTestDatabaseUrl({ DATABASE_URL: "postgresql://user:secret@localhost:5432/sispl_local" }));
@@ -29,7 +30,7 @@ test("repository rejects an empty tenant id before querying", async () => {
   });
 
   await assert.rejects(
-    loadDashboardRecords(unusableDatabase as never, ""),
+    loadDashboardRecords(unusableDatabase as never, "", FIRM_SCOPE),
     /tenantId is required/,
   );
   assert.equal(queried, false);

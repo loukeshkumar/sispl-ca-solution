@@ -18,10 +18,14 @@ test("both password changes go through one repository function", async () => {
   assert.match(repository, /export async function changePassword\(/);
   assert.doesNotMatch(repository, /changeRequiredPassword/, "the forced-only variant is gone");
 
+  const start = repository.indexOf("export async function changePassword");
+  assert.ok(start > 0, "changePassword is exported");
+  const body = repository.slice(start, repository.indexOf("\n}", start));
+
   // Neither path may keep a session alive that predates the new password.
-  assert.match(repository, /userSessions\)\.set\(\{ revokedAt: new Date\(\) \}\)/);
+  assert.match(body, /userSessions\)\.set\(\{ revokedAt: new Date\(\) \}\)/);
   // The update is conditional on the hash it read, so concurrent changes cannot both win.
-  assert.match(repository, /eq\(userCredentials\.passwordHash, credential\.passwordHash\)/);
+  assert.match(body, /eq\(userCredentials\.passwordHash, credential\.passwordHash\)/);
 
   assert.match(actions, /export async function changePasswordAction/);
   assert.match(actions, /export async function changeOwnPasswordAction/);
@@ -46,9 +50,11 @@ test("expiring a password keeps the hash and drops the sessions", async () => {
   assert.match(body, /userSessions\)\.set\(\{ revokedAt: new Date\(\) \}\)/);
   assert.match(body, /action: "employee\.password_expired"/);
 
-  // The same guards as provisioning: never a Super Admin, and an Admin only by one.
+  // The same guards as provisioning: never a Super Admin, an Admin only by one,
+  // and never a shared identity another firm also governs.
   assert.match(body, /accessClass === "super_admin"\) throw new TeamRepositoryError\("protected_super_admin"\)/);
   assert.match(body, /accessClass === "admin" && actor\?\.accessClass !== "super_admin"\) throw new TeamRepositoryError\("role_forbidden"\)/);
+  assert.match(body, /await assertExclusiveIdentity\(transaction, employee\.userId\)/);
   assert.match(body, /throw new TeamRepositoryError\("no_login"\)/);
 });
 

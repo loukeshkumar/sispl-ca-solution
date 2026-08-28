@@ -107,13 +107,13 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     // directly, so the same rule has to refuse it here. Both read one map, which
     // is why a workspace can no longer be gated in the menu but open by URL.
     if (!canOpenWorkspace(session, initialWorkspace)) redirect("/forbidden");
-    // A manager's dashboard covers their reports, so the reporting line is read
-    // before the records that it narrows.
-    const scope = dashboardScopeFor(
-      session,
-      session.roleKey === "manager" ? await listDirectReports(getDatabase(), session.tenantId, session.userId) : [],
-    );
     try {
+      // A manager's dashboard covers their reports, so the reporting line is read
+      // before the records that it narrows.
+      const scope = dashboardScopeFor(
+        session,
+        session.roleKey === "manager" ? await listDirectReports(getDatabase(), session.tenantId, session.userId) : [],
+      );
       const todayKey = indiaDateKey();
       [data, documentWorkspace, employees, capabilityMatrix, todoWorkspace, attendanceWorkspace, salaryWorkspace, packageSetupWorkspace, clientPackageWorkspace, serviceManagementWorkspace, roleManagementWorkspace, unreadNotifications, billingWorkspace, registersWorkspace, registerOptions, timesheetWorkspace, timesheetOptions, insightsWorkspace, clientDocuments, workQueueRows, workQueueTotals, workQueueLanes, workQueueMembers, taskQueueRows, taskQueueTotals, taskQueueLanes, taskQueueMembers, todoLoadStrip, complianceRows, complianceGaps, complianceEvidenced, calendarWorkspace, calendarMembers] = await Promise.all([
         getPostgresDashboardDataForTenant(session.tenantId, scope),

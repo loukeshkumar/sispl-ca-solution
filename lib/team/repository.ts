@@ -279,6 +279,7 @@ export async function expireEmployeePassword(database: DashboardDatabase, tenant
     if (!employee) throw new TeamRepositoryError("not_found");
     if (employee.accessClass === "super_admin") throw new TeamRepositoryError("protected_super_admin");
     if (employee.accessClass === "admin" && actor?.accessClass !== "super_admin") throw new TeamRepositoryError("role_forbidden");
+    await assertExclusiveIdentity(transaction, employee.userId);
     // Nothing to expire on an account that was never given a login.
     const [expired] = await transaction.update(userCredentials).set({ mustChangePassword: true })
       .where(eq(userCredentials.userId, employee.userId)).returning({ userId: userCredentials.userId });

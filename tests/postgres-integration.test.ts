@@ -91,7 +91,7 @@ test("development seed is idempotent and loads the expected dashboard rows", asy
     workProfiles: 5,
   });
 
-  const records = await loadDashboardRecords(database, SEEDED_TENANT_ID);
+  const records = await loadDashboardRecords(database, SEEDED_TENANT_ID, FIRM_SCOPE);
   assert.equal(records.clients.length, 5);
   assert.equal(records.workItems.length, 4);
 });
@@ -1172,7 +1172,7 @@ test("compliance work lifecycle is tenant-scoped, audited, and completed outside
     assert.equal(completed?.status, "completed");
     assert.equal(completed?.progress, 100);
     assert.equal(completed?.missingItemCount, 0);
-    const dashboard = mapDashboardRecords(await loadDashboardRecords(database, identity.tenantId), new Date("2026-08-16T09:00:00+05:30"), "postgres");
+    const dashboard = mapDashboardRecords(await loadDashboardRecords(database, identity.tenantId, FIRM_SCOPE), new Date("2026-08-16T09:00:00+05:30"), "postgres");
     assert.equal(dashboard.work.some((item) => item.id === workItemId), false);
     assert.ok(dashboard.metrics.completed >= 1);
 

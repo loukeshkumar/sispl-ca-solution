@@ -13,7 +13,7 @@ import {
   workItems,
 } from "../../../db/schema";
 import * as schema from "../../../db/schema";
-import { FIRM_SCOPE, scopedUserIds, type DashboardScope } from "../scope";
+import { scopedUserIds, type DashboardScope } from "../scope";
 import type { DashboardRecords } from "../types";
 
 export type DashboardDatabase = NodePgDatabase<typeof schema>;
@@ -44,7 +44,7 @@ function scopedWorkFilter(scope: DashboardScope) {
 export async function loadDashboardRecords(
   database: DashboardDatabase,
   tenantId: string,
-  scope: DashboardScope = FIRM_SCOPE,
+  scope: DashboardScope,
 ): Promise<DashboardRecords> {
   if (!tenantId.trim()) throw new Error("tenantId is required.");
 
