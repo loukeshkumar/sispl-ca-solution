@@ -147,7 +147,9 @@ test("the sidebar rail stays usable: escape hatch, labels, and drawer exemption"
   assert.match(script, /data-sidebar/);
   assert.match(script, /localStorage\.getItem\("sispl-sidebar"\)/);
   assert.match(shell, /useSyncExternalStore\(subscribeSidebar, readSidebarMode, readServerSidebarMode\)/);
-  assert.match(shell, /function readServerSidebarMode\(\) \{\n {2}return false;/);
+  // `\r?\n`, because git checks these LF blobs out as CRLF wherever
+  // core.autocrlf is on, and this reads the working tree rather than the blob.
+  assert.match(shell, /function readServerSidebarMode\(\) \{\r?\n {2}return false;/);
 
   // Collapsed, an icon has no words, so every rail control names itself.
   assert.match(shell, /className="sidebar-tooltip"/);
