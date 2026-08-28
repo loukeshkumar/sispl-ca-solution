@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import { randomUUID } from "node:crypto";
-import { and, count, eq, inArray, ne } from "drizzle-orm";
+import { and, count, eq, inArray, isNotNull, ne } from "drizzle-orm";
 
 import {
   attendanceDays, attendanceEvents, attendancePeriodSummaries, attendancePeriods, attendancePolicies, auditEvents, employeeBankAccounts,
@@ -670,6 +670,41 @@ test("direct reports are read from the reporting line and stay inside the firm",
 
   // A manager id from no firm has no reports anywhere.
   assert.deepEqual(await listDirectReports(database, identity.tenantId, randomUUID()), []);
+
+  // A manager id matching no row proves nothing about the tenant clause — it
+  // returns [] whether or not that clause exists. Prove it with a manager who
+  // really does have reports in this tenant, looked up under a foreign one.
+  const [existingManager] = await database.select({ managerUserId: employeeWorkProfiles.managerUserId })
+    .from(employeeWorkProfiles)
+    .where(and(eq(employeeWorkProfiles.tenantId, identity.tenantId), isNotNull(employeeWorkProfiles.managerUserId)))
+    .limit(1);
+
+  let realManagerId = existingManager?.managerUserId ?? null;
+  let plantedUserId = "";
+  if (!realManagerId) {
+    // The seed changed shape and no longer has a manager/report pair; plant
+    // one under the real tenant so the assertion still proves something.
+    realManagerId = identity.userId;
+    plantedUserId = randomUUID();
+    await database.insert(users).values({ id: plantedUserId, email: `direct-report-${plantedUserId}@example.invalid`, fullName: "Planted Direct Report" });
+    await database.insert(tenantMemberships).values({ id: randomUUID(), tenantId: identity.tenantId, userId: plantedUserId, roleKey: "associate", status: "active" });
+    await database.insert(employeeWorkProfiles).values({
+      id: randomUUID(), tenantId: identity.tenantId, employeeUserId: plantedUserId, managerUserId: realManagerId,
+      employmentType: "employee", workLocationState: "Bihar",
+    });
+  }
+
+  try {
+    const realTenantReports = await listDirectReports(database, identity.tenantId, realManagerId);
+    assert.ok(realTenantReports.length > 0, "the chosen manager id must actually have direct reports in its own tenant");
+    assert.deepEqual(await listDirectReports(database, FOREIGN_TENANT_ID, realManagerId), []);
+  } finally {
+    if (plantedUserId) {
+      await database.delete(employeeWorkProfiles).where(and(eq(employeeWorkProfiles.tenantId, identity.tenantId), eq(employeeWorkProfiles.employeeUserId, plantedUserId)));
+      await database.delete(tenantMemberships).where(and(eq(tenantMemberships.tenantId, identity.tenantId), eq(tenantMemberships.userId, plantedUserId)));
+      await database.delete(users).where(eq(users.id, plantedUserId));
+    }
+  }
 });
 
 test("employee disabling and task assignment serialize on the membership boundary", async () => {
