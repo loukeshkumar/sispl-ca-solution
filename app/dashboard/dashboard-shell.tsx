@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "
 import { logoutAction } from "../auth-actions";
 import { roleLabel, type AuthViewer } from "../../lib/auth/authorization";
 import { canOpenWorkspace } from "../../lib/dashboard/navigation";
+import { ChangePasswordDialog } from "./change-password-dialog";
 import { CommandPalette } from "./command-palette";
 import { CreateMenu } from "./create-menu";
 import { GlobalSearch } from "./global-search";
@@ -121,6 +122,16 @@ const allEntries: NavEntry[] = navigation.flatMap((section) => section.entries);
 
 /** The palette searches destinations, not parents, so groups are flattened away. */
 export const paletteDestinations: NavLeaf[] = allEntries.flatMap((entry) => (isGroup(entry) ? entry.items : [entry]));
+
+/**
+ * The route behind each destination that is a page rather than a workspace.
+ * The sidebar renders those as links, but the palette and the `g` jumps report
+ * a label, so both navigate handlers resolve it here instead of keeping their
+ * own list — a route missing from that list used to land on the dashboard.
+ */
+export const destinationRoutes: Record<string, string> = Object.fromEntries(
+  paletteDestinations.flatMap((leaf) => (leaf.href ? [[leaf.label, leaf.href]] : [])),
+);
 
 const SIDEBAR_STORAGE_KEY = "sispl-sidebar";
 const SIDEBAR_CHANGE_EVENT = "sispl-sidebar-change";
@@ -358,7 +369,10 @@ function SidebarContent({
           <InitialsAvatar initials={accountInitials} tone="light" />
           <span><strong>{accountName}</strong><small>{accountRole}</small></span>
           {viewer ? (
-            <form action={logoutAction}><button className="account-signout" type="submit">Sign out</button></form>
+            <div className="account-controls">
+              <ChangePasswordDialog />
+              <form action={logoutAction}><button className="account-signout" type="submit">Sign out</button></form>
+            </div>
           ) : (
             <button aria-label="Account options" className="icon-button" disabled type="button">•••</button>
           )}

@@ -7,7 +7,7 @@ import { ClientDocumentsWorkspace } from "./dashboard/client-documents-workspace
 import { ClientsWorkspace, type ClientSegment } from "./dashboard/clients-workspace";
 import { ComplianceWorkspace } from "./dashboard/compliance-workspace";
 import { CalendarWorkspace, type CalendarViewData } from "./dashboard/calendar-workspace";
-import { DashboardShell } from "./dashboard/dashboard-shell";
+import { DashboardShell, destinationRoutes } from "./dashboard/dashboard-shell";
 import { DocumentsWorkspace } from "./dashboard/documents-workspace";
 import { OverviewWorkspace, type OverviewFilter } from "./dashboard/overview-workspace";
 import { WorkWorkspace } from "./dashboard/work-workspace";
@@ -78,9 +78,13 @@ export default function DashboardClient({ calendar, compliance, todoQueue, taskQ
   const canWriteWork = Boolean(viewer && hasPermission(viewer, "work:write"));
   const canWriteDocuments = Boolean(viewer && hasPermission(viewer, "documents:write"));
   const navigate = (destination: string) => {
+    setMenuOpen(false);
+    // A destination that is its own page leaves the dashboard, so there is no
+    // workspace to make active first.
+    const route = destinationRoutes[destination];
+    if (route) { router.push(route); return; }
     const workspace = ({ Clients: "clients", "Client Documents": "client-documents", "My work": "work", "To-do": "todos", Attendance: "attendance", Salary: "salary", Tasks: "tasks", Compliance: "compliance", Documents: "documents", Calendar: "calendar", Employees: "team", "Package Setup": "package-setup", "Client Packages": "client-packages", "Service Management": "service-management", "User Roles Management": "user-roles", Billing: "billing", Registers: "registers", Timesheets: "timesheets", Insights: "insights" } as Record<string, string>)[destination];
     setActive(destination);
-    setMenuOpen(false);
     router.push(workspace ? `/?workspace=${workspace}` : "/");
   };
 
@@ -135,7 +139,7 @@ export default function DashboardClient({ calendar, compliance, todoQueue, taskQ
       ) : active === "Service Management" ? (
         <ServiceManagementWorkspace canManage={Boolean(viewer && hasPermission(viewer, "services:manage"))} workspace={serviceManagement} />
       ) : active === "User Roles Management" ? (
-        <UserRolesWorkspace canManage={Boolean(viewer && hasPermission(viewer, "roles:manage"))} saved={roleSaved} workspace={roleManagement} />
+        <UserRolesWorkspace canManage={Boolean(viewer && hasPermission(viewer, "roles:manage"))} canManagePeople={Boolean(viewer && hasPermission(viewer, "team:manage"))} saved={roleSaved} workspace={roleManagement} />
       ) : active === "Billing" ? (
         <BillingWorkspace canManage={Boolean(viewer && hasPermission(viewer, "billing:manage"))} data={billing} />
       ) : active === "Registers" ? (

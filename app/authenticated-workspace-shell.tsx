@@ -5,7 +5,7 @@ import { useState, type ReactNode } from "react";
 
 import type { AuthViewer } from "../lib/auth/authorization";
 import type { DashboardData } from "../lib/dashboard/types";
-import { DashboardShell } from "./dashboard/dashboard-shell";
+import { DashboardShell, destinationRoutes } from "./dashboard/dashboard-shell";
 
 const workspaceUrls: Record<string, string> = {
   Overview: "/",
@@ -45,7 +45,7 @@ export default function AuthenticatedWorkspaceShell({ active, children, data, un
       onMenuOpen={() => setMenuOpen(true)}
       onNavigate={(destination) => {
         setMenuOpen(false);
-        router.push(workspaceUrls[destination] ?? "/");
+        router.push(destinationRoutes[destination] ?? workspaceUrls[destination] ?? "/");
       }}
       unreadNotifications={unreadNotifications}
       viewer={viewer}

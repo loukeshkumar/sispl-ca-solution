@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { and, asc, count, eq, inArray, isNull, sql } from "drizzle-orm";
 
-import { auditEvents, roleDefinitions, rolePermissions, tenantMemberships, userSessions, users } from "../../db/schema";
+import { auditEvents, employeeProfiles, roleDefinitions, rolePermissions, tenantMemberships, userCredentials, userSessions, users } from "../../db/schema";
 import { allPermissions, type AccessClass, type Permission } from "../auth/authorization";
 import type { DashboardDatabase } from "../dashboard/postgres/repository";
 import { roleKeyFromName, type ManagedRoleClass, type RoleDefinitionInput } from "./validation";
@@ -27,7 +27,26 @@ export type ManagedRoleSummary = AssignableRole & {
 /** Roles carry their permissions so the edit dialog opens without a round trip. */
 export type ManagedRoleWithPermissions = ManagedRoleSummary & { permissions: Permission[] };
 
+/**
+ * One governed account.
+ *
+ * `employeeId` is null for a membership with no employee profile behind it, and
+ * the credential actions need one, so such a row is shown but not actionable.
+ */
+export type RoleMember = {
+  accessClass: AccessClass;
+  email: string;
+  employeeId: string | null;
+  fullName: string;
+  loginEnabled: boolean;
+  membershipId: string;
+  mustChangePassword: boolean;
+  roleName: string;
+  userId: string;
+};
+
 export type RoleManagementWorkspace = {
+  people: RoleMember[];
   roles: ManagedRoleWithPermissions[];
   superAdmins: Array<{ email: string; fullName: string; id: string }>;
   metrics: { activeAdmins: number; employeeCategories: number; protectedPermissions: number; totalAssigned: number };
@@ -109,6 +128,26 @@ export async function listRoleManagementWorkspace(database: DashboardDatabase, t
       .where(and(eq(tenantMemberships.tenantId, tenantId), eq(tenantMemberships.accessClass, "super_admin"), eq(tenantMemberships.status, "active")))
       .orderBy(asc(users.fullName)),
   ]);
+  // Starts from the membership rather than the employee profile, so an account
+  // governed by a role still appears when nobody has filled in its profile.
+  const people = await database.select({
+    accessClass: tenantMemberships.accessClass,
+    email: users.email,
+    employeeId: employeeProfiles.id,
+    fullName: users.fullName,
+    loginEnabled: sql<boolean>`${userCredentials.userId} is not null`,
+    membershipId: tenantMemberships.id,
+    mustChangePassword: sql<boolean>`coalesce(${userCredentials.mustChangePassword}, false)`,
+    roleName: roleDefinitions.name,
+    userId: users.id,
+  }).from(tenantMemberships)
+    .innerJoin(users, eq(users.id, tenantMemberships.userId))
+    .leftJoin(roleDefinitions, and(eq(roleDefinitions.tenantId, tenantId), eq(roleDefinitions.id, tenantMemberships.roleDefinitionId)))
+    .leftJoin(employeeProfiles, and(eq(employeeProfiles.tenantId, tenantId), eq(employeeProfiles.userId, tenantMemberships.userId)))
+    .leftJoin(userCredentials, eq(userCredentials.userId, tenantMemberships.userId))
+    .where(and(eq(tenantMemberships.tenantId, tenantId), eq(tenantMemberships.status, "active")))
+    .orderBy(asc(users.fullName));
+
   const grantRows = await database.select({ roleDefinitionId: rolePermissions.roleDefinitionId, permissionKey: rolePermissions.permissionKey })
     .from(rolePermissions).where(eq(rolePermissions.tenantId, tenantId));
   const grantsByRole = new Map<string, Permission[]>();
@@ -118,6 +157,11 @@ export async function listRoleManagementWorkspace(database: DashboardDatabase, t
   }
   const typedRoles = (roles as ManagedRoleSummary[]).map((role) => ({ ...role, permissions: grantsByRole.get(role.id) ?? [] }));
   return {
+    people: people.map((person) => ({
+      ...person,
+      accessClass: person.accessClass as AccessClass,
+      roleName: person.accessClass === "super_admin" ? "Super Admin" : person.roleName ?? "Unassigned",
+    })),
     roles: typedRoles,
     superAdmins,
     metrics: {

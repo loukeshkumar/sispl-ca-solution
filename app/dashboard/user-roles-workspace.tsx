@@ -9,8 +9,9 @@ import type { ManagedRoleWithPermissions } from "../../lib/roles/repository";
 import { KpiCard, PageTitle, StatusBadge } from "./dashboard-ui";
 import type { DialogState } from "./form-dialog";
 import RoleDialog from "./role-dialog";
+import { RoleMembers } from "./role-members";
 
-export function UserRolesWorkspace({ canManage, saved, workspace }: { canManage: boolean; saved?: string; workspace: RoleWorkspaceData }) {
+export function UserRolesWorkspace({ canManage, canManagePeople, saved, workspace }: { canManage: boolean; canManagePeople: boolean; saved?: string; workspace: RoleWorkspaceData }) {
   const [dialog, setDialog] = useState<DialogState<ManagedRoleWithPermissions>>(null);
   const admins = workspace.roles.filter((role) => role.roleClass === "admin");
   const employees = workspace.roles.filter((role) => role.roleClass === "employee");
@@ -36,6 +37,8 @@ export function UserRolesWorkspace({ canManage, saved, workspace }: { canManage:
       <RoleRegister canManage={canManage} description="Each employee receives exactly one category. Changes apply to every employee assigned to that category." empty="No Employee categories are available." icon={<UsersRound aria-hidden="true" />} onEdit={setDialog} roles={employees} title="Employee categories" />
       <RoleDialog dialog={dialog} onClose={() => setDialog(null)} />
     </div>
+
+    <RoleMembers canManage={canManagePeople} people={workspace.people} />
   </section>;
 }
 

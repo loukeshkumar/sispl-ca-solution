@@ -5,6 +5,7 @@ import { requirePermission } from "../lib/auth/server";
 import { hasPermission } from "../lib/auth/authorization";
 import { resolveDataSource } from "../lib/dashboard/config";
 import { getDashboardDataForConfiguredSource } from "../lib/dashboard/provider";
+import { canOpenWorkspace } from "../lib/dashboard/navigation";
 import { getDatabase } from "../lib/dashboard/postgres/pool";
 import { getPostgresDashboardDataForTenant } from "../lib/dashboard/postgres/provider";
 import { listDocumentWorkspace, type DocumentWorkspaceData } from "../lib/documents/repository";
@@ -60,7 +61,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   let packageSetupWorkspace: PackageSetupWorkspaceData = { metrics: { activePackages: 0, activeServices: 0, archivedPackages: 0, averageFeePaise: 0 }, packages: [], services: [] };
   let clientPackageWorkspace: ClientPackageWorkspaceData = { assignments: [], clients: [], metrics: { activeAssignments: 0, monthlyRecurringPaise: 0, renewalsDue: 0, unassignedClients: 0 }, packages: [], services: [], todayKey: "" };
   let serviceManagementWorkspace: ServiceManagementWorkspaceData = { metrics: { activeServices: 0, archivedServices: 0, categories: 0, packageLinks: 0 }, services: [] };
-  let roleManagementWorkspace: RoleManagementWorkspace = { roles: [], superAdmins: [], metrics: { activeAdmins: 0, employeeCategories: 0, protectedPermissions: 0, totalAssigned: 0 } };
+  let roleManagementWorkspace: RoleManagementWorkspace = { people: [], roles: [], superAdmins: [], metrics: { activeAdmins: 0, employeeCategories: 0, protectedPermissions: 0, totalAssigned: 0 } };
   let unreadNotifications = 0;
   let billingWorkspace: BillingWorkspaceData = { invoices: [], metrics: { draftCount: 0, outstandingPaise: 0, overdueCount: 0, overduePaise: 0, collectedThisMonthPaise: 0 }, todayKey: "" };
   let registersWorkspace: RegistersWorkspaceData = emptyRegistersWorkspace();
@@ -101,23 +102,10 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     const wantsClientDocuments = workspace === "client-documents";
     const canReadTasks = hasPermission(session, "tasks:read");
     const canReadTeam = hasPermission(session, "team:read");
-    const canReadPackages = hasPermission(session, "packages:read");
-    const canManageClientPackages = hasPermission(session, "client_packages:manage");
-    const canReadServices = hasPermission(session, "services:read");
-    const canReadRoles = hasPermission(session, "roles:read");
-    const canReadBilling = hasPermission(session, "billing:read");
-    const canReadRegisters = hasPermission(session, "registers:read");
-    const canUseTimesheets = hasPermission(session, "timesheets:use");
-    if (initialWorkspace === "Billing" && !canReadBilling) redirect("/forbidden");
-    if (initialWorkspace === "Registers" && !canReadRegisters) redirect("/forbidden");
-    if (initialWorkspace === "Timesheets" && !canUseTimesheets) redirect("/forbidden");
-    if ((initialWorkspace === "Documents" || initialWorkspace === "Client Documents") && !canReadDocuments) {
-      redirect("/forbidden");
-    }
-    if ((initialWorkspace === "Tasks" && !canReadTasks) || (initialWorkspace === "Employees" && !canReadTeam)) redirect("/forbidden");
-    if ((initialWorkspace === "Package Setup" && !canReadPackages) || (initialWorkspace === "Client Packages" && !canManageClientPackages)) redirect("/forbidden");
-    if (initialWorkspace === "Service Management" && !canReadServices) redirect("/forbidden");
-    if (initialWorkspace === "User Roles Management" && !canReadRoles) redirect("/forbidden");
+    // The sidebar hides a workspace this viewer cannot open; the URL names one
+    // directly, so the same rule has to refuse it here. Both read one map, which
+    // is why a workspace can no longer be gated in the menu but open by URL.
+    if (!canOpenWorkspace(session, initialWorkspace)) redirect("/forbidden");
     try {
       const todayKey = indiaDateKey();
       [data, documentWorkspace, employees, capabilityMatrix, todoWorkspace, attendanceWorkspace, salaryWorkspace, packageSetupWorkspace, clientPackageWorkspace, serviceManagementWorkspace, roleManagementWorkspace, unreadNotifications, billingWorkspace, registersWorkspace, registerOptions, timesheetWorkspace, timesheetOptions, insightsWorkspace, clientDocuments, workQueueRows, workQueueTotals, workQueueLanes, workQueueMembers, taskQueueRows, taskQueueTotals, taskQueueLanes, taskQueueMembers, todoLoadStrip, complianceRows, complianceGaps, complianceEvidenced, calendarWorkspace, calendarMembers] = await Promise.all([

@@ -3,10 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { requireSuperAdmin } from "../../../lib/auth/server";
+import { requirePermission, requireSuperAdmin } from "../../../lib/auth/server";
 import { getDatabase } from "../../../lib/dashboard/postgres/pool";
 import { archiveRoleDefinition, createRoleDefinition, RoleRepositoryError, updateRoleDefinition } from "../../../lib/roles/repository";
-import { validateRoleDefinitionForm, type RoleDefinitionActionState } from "../../../lib/roles/validation";
+import { expireEmployeePassword, provisionEmployeeAccess, TeamRepositoryError } from "../../../lib/team/repository";
+import { validateRoleDefinitionForm, type MemberAccessState, type RoleDefinitionActionState } from "../../../lib/roles/validation";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -47,4 +48,38 @@ export async function archiveRoleDefinitionAction(formData: FormData) {
   }
   revalidatePath("/");
   redirect("/?workspace=user-roles&saved=archived");
+}
+
+/**
+ * Credential actions for the people register.
+ *
+ * They require `team:manage` rather than the Super Admin gate above, because
+ * they are the same acts the employee page already offers and go through the
+ * same repository guards — a Super Admin target is refused, and an Admin target
+ * is refused to anyone who is not a Super Admin.
+ */
+export async function resetMemberPasswordAction(employeeId: string, _previous: MemberAccessState): Promise<MemberAccessState> {
+  void _previous;
+  const session = await requirePermission("team:manage", "/?workspace=user-roles");
+  if (!UUID_PATTERN.test(employeeId)) return { error: "The employee reference is invalid." };
+  try {
+    const temporaryPassword = await provisionEmployeeAccess(getDatabase(), session.tenantId, session.userId, employeeId);
+    revalidatePath("/");
+    return { error: "", employeeId, temporaryPassword };
+  } catch (error) {
+    return { error: error instanceof TeamRepositoryError ? error.message : "The password could not be reset." };
+  }
+}
+
+export async function expireMemberPasswordAction(employeeId: string, _previous: MemberAccessState): Promise<MemberAccessState> {
+  void _previous;
+  const session = await requirePermission("team:manage", "/?workspace=user-roles");
+  if (!UUID_PATTERN.test(employeeId)) return { error: "The employee reference is invalid." };
+  try {
+    await expireEmployeePassword(getDatabase(), session.tenantId, session.userId, employeeId);
+    revalidatePath("/");
+    return { error: "", employeeId, expired: true };
+  } catch (error) {
+    return { error: error instanceof TeamRepositoryError ? error.message : "The password could not be expired." };
+  }
 }
