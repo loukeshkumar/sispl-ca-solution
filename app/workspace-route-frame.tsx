@@ -3,13 +3,14 @@ import type { ReactNode } from "react";
 import { requirePermission } from "../lib/auth/server";
 import { getDatabase } from "../lib/dashboard/postgres/pool";
 import { getPostgresDashboardDataForTenant } from "../lib/dashboard/postgres/provider";
+import { FIRM_SCOPE } from "../lib/dashboard/scope";
 import { countUnreadNotifications } from "../lib/notifications/repository";
 import AuthenticatedWorkspaceShell from "./authenticated-workspace-shell";
 
 export default async function WorkspaceRouteFrame({ active, children }: { active: string; children: ReactNode }) {
   const session = await requirePermission("dashboard:read");
   const [data, unreadNotifications] = await Promise.all([
-    getPostgresDashboardDataForTenant(session.tenantId),
+    getPostgresDashboardDataForTenant(session.tenantId, FIRM_SCOPE),
     countUnreadNotifications(getDatabase(), session.tenantId, session.userId),
   ]);
   return (

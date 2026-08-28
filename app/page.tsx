@@ -8,6 +8,7 @@ import { getDashboardDataForConfiguredSource } from "../lib/dashboard/provider";
 import { canOpenWorkspace } from "../lib/dashboard/navigation";
 import { getDatabase } from "../lib/dashboard/postgres/pool";
 import { getPostgresDashboardDataForTenant } from "../lib/dashboard/postgres/provider";
+import { FIRM_SCOPE } from "../lib/dashboard/scope";
 import { listDocumentWorkspace, type DocumentWorkspaceData } from "../lib/documents/repository";
 import { listCapabilityMatrix, type CapabilityMatrix } from "../lib/team/capability-repository";
 import { listEmployees, type EmployeeSummary } from "../lib/team/repository";
@@ -109,7 +110,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     try {
       const todayKey = indiaDateKey();
       [data, documentWorkspace, employees, capabilityMatrix, todoWorkspace, attendanceWorkspace, salaryWorkspace, packageSetupWorkspace, clientPackageWorkspace, serviceManagementWorkspace, roleManagementWorkspace, unreadNotifications, billingWorkspace, registersWorkspace, registerOptions, timesheetWorkspace, timesheetOptions, insightsWorkspace, clientDocuments, workQueueRows, workQueueTotals, workQueueLanes, workQueueMembers, taskQueueRows, taskQueueTotals, taskQueueLanes, taskQueueMembers, todoLoadStrip, complianceRows, complianceGaps, complianceEvidenced, calendarWorkspace, calendarMembers] = await Promise.all([
-        getPostgresDashboardDataForTenant(session.tenantId),
+        getPostgresDashboardDataForTenant(session.tenantId, FIRM_SCOPE),
         canReadDocuments ? listDocumentWorkspace(getDatabase(), session.tenantId) : Promise.resolve(documentWorkspace),
         canReadTeam ? listEmployees(getDatabase(), session.tenantId) : Promise.resolve(employees),
         // Only for the workspace that renders it; the grid is a page of its own.

@@ -84,18 +84,23 @@ test("PostgreSQL provider does not continue when the seeded tenant is missing", 
 
 test("authenticated PostgreSQL provider loads only the explicit session tenant", async () => {
   let receivedTenantId = "";
+  let receivedScope: unknown = null;
   const dashboard = await getPostgresDashboardDataForTenant(
     SEEDED_TENANT_ID,
+    { kind: "own", userId: "viewer-1" },
     new Date("2026-08-15T09:00:00+05:30"),
     {
       getDatabase: () => ({}) as never,
-      loadDashboardRecords: async (_database, tenantId) => {
+      loadDashboardRecords: async (_database, tenantId, scope) => {
         receivedTenantId = tenantId;
+        receivedScope = scope;
         return demoDashboardRecords;
       },
     },
   );
 
   assert.equal(receivedTenantId, SEEDED_TENANT_ID);
+  assert.deepEqual(receivedScope, { kind: "own", userId: "viewer-1" });
   assert.equal(dashboard.source, "postgres");
+  assert.equal(dashboard.scope?.kind, "own");
 });
