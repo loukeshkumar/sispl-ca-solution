@@ -242,6 +242,29 @@ export async function updateEmployee(database: DashboardDatabase, tenantId: stri
   });
 }
 
+/**
+ * Who this person reports to.
+ *
+ * The reporting line already governs manager scope and attendance approval,
+ * and the employee record never showed it — so the page could not answer the
+ * first question anybody asks about somebody they do not know.
+ */
+export async function findReportingManager(
+  database: DashboardDatabase,
+  tenantId: string,
+  employeeUserId: string,
+): Promise<{ fullName: string; userId: string } | null> {
+  const [row] = await database.select({ fullName: users.fullName, userId: users.id })
+    .from(employeeWorkProfiles)
+    .innerJoin(users, eq(users.id, employeeWorkProfiles.managerUserId))
+    .where(and(
+      eq(employeeWorkProfiles.tenantId, tenantId),
+      eq(employeeWorkProfiles.employeeUserId, employeeUserId),
+    ))
+    .limit(1);
+  return row ?? null;
+}
+
 export type EmployeeActivityEntry = {
   action: string;
   actorName: string | null;

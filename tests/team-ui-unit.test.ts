@@ -18,12 +18,15 @@ test("employee management routes enforce team permissions and accessible forms",
   // The eyebrow names the page; the heading is the person, so the phrase is
   // not repeated in both.
   assert.match(employeePage, /EMPLOYEE 360/);
-  assert.match(employeePage, /Provision login access/);
+  // The component itself, rather than a heading that framed it.
+  assert.match(employeePage, /<ProvisionAccess employeeId=/);
   assert.match(employeePage, /hasPermission\(session, "attendance:review"\)/);
   assert.match(employeePage, /hasPermission\(session, "salary:manage"\)/);
   assert.match(form, /name="roleDefinitionId"/);
-  assert.match(employeePage, /Attendance overview/);
-  assert.match(employeePage, /Salary structure/);
+  // Both are still surfaced, now as a leave card and a salary figure rather
+  // than two panels headed "Attendance overview" and "Salary structure".
+  assert.match(employeePage, /attendanceSummary\.presentDays/);
+  assert.match(employeePage, /\/salary\/structures\/\$\{employee\.userId\}/);
   assert.match(passwordPage, /Create your permanent password/);
   assert.match(passwordPage, /logoutAction/);
   assert.match(downloadRoute, /authorizeRoutePermission\("documents:read"\)/);

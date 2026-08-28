@@ -66,7 +66,8 @@ test("glass surfaces actually frost: translucent, prefixed, and over something",
 
   // Every var() must resolve, or the whole declaration is dropped at compute time.
   const defined = new Set([...css.matchAll(/^\s+(--[a-z-]+):/gm)].map((match) => match[1]));
-  const inherited = new Set(["--font-geist-sans", "--font-geist-mono", "--section-hue", "--skeleton-columns", "--kpi-hue"]);
+  // Supplied by an inline style at the point of use, like the hues above.
+  const inherited = new Set(["--font-geist-sans", "--font-geist-mono", "--section-hue", "--skeleton-columns", "--kpi-hue", "--ring-colour", "--ring-value"]);
   for (const [, token] of css.matchAll(/var\((--[a-z-]+)(?=[),])/g)) {
     assert.ok(defined.has(token) || inherited.has(token), `${token} is used but never defined`);
   }

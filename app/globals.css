@@ -9348,6 +9348,335 @@ button.row-action-link {
   padding-bottom: 2px;
 }
 
+/* ---- Employee 360: identity band and bento ----------------------------- */
+
+.emp-hero {
+  background:
+    linear-gradient(120deg, color-mix(in srgb, var(--violet) 12%, var(--surface)), var(--surface) 58%),
+    var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  display: grid;
+  gap: 20px;
+  overflow: hidden;
+  padding: 26px 28px;
+}
+
+.emp-hero-top {
+  align-items: flex-start;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.emp-avatar {
+  align-items: center;
+  background: linear-gradient(140deg, var(--violet), #8b5cf6);
+  border-radius: 22px;
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--violet) 32%, transparent);
+  color: #fff;
+  display: flex;
+  flex: 0 0 auto;
+  font-size: 28px;
+  font-weight: 800;
+  height: 76px;
+  justify-content: center;
+  width: 76px;
+}
+
+.emp-id {
+  display: grid;
+  flex: 1 1 320px;
+  gap: 8px;
+  min-width: 0;
+}
+
+.emp-id h1 {
+  font-size: 30px;
+  letter-spacing: -.03em;
+  line-height: 1.1;
+  margin: 0;
+}
+
+.emp-chips {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.emp-chip {
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: var(--type-compact);
+  font-weight: 750;
+  padding: 4px 11px;
+}
+
+.emp-chip.is-role { background: color-mix(in srgb, var(--violet) 14%, transparent); color: var(--violet); }
+.emp-chip.is-live { background: color-mix(in srgb, var(--mint) 16%, transparent); color: var(--mint-ink, var(--mint)); }
+.emp-chip.is-off { background: color-mix(in srgb, var(--red) 13%, transparent); color: var(--red); }
+
+.emp-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* One-pixel gaps over a line colour: a ruled strip without six borders. */
+.emp-facts {
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  display: grid;
+  gap: 1px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  margin: 0;
+  overflow: hidden;
+}
+
+.emp-facts > div {
+  background: var(--surface);
+  display: grid;
+  gap: 2px;
+  padding: 11px 14px;
+}
+
+.emp-facts dt {
+  color: var(--muted);
+  font-size: var(--type-label);
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.emp-facts dd {
+  font-size: var(--type-supporting);
+  font-weight: 750;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/*
+ * Twelve columns so each card can be sized by how much it has to say, rather
+ * than every panel taking the full width in a queue.
+ */
+.emp-bento {
+  display: grid;
+  gap: var(--grid-gap);
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+}
+
+.emp-card {
+  align-content: start;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  padding: 20px;
+}
+
+.emp-card.span-4 { grid-column: span 4; }
+.emp-card.span-5 { grid-column: span 5; }
+.emp-card.span-7 { grid-column: span 7; }
+.emp-card.span-8 { grid-column: span 8; }
+.emp-card.span-12 { grid-column: span 12; }
+
+.emp-card-head {
+  align-items: baseline;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.emp-card-head h2 {
+  font-size: 16px;
+  letter-spacing: -.01em;
+  margin: 0;
+}
+
+.emp-card-head a,
+.emp-card-head > span {
+  color: var(--violet);
+  font-size: var(--type-compact);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* A share against a target reads faster as an arc than as two numbers. */
+.emp-ring-row {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.emp-ring {
+  align-items: center;
+  background: conic-gradient(var(--ring-colour) calc(var(--ring-value) * 1%), color-mix(in srgb, var(--ink) 8%, transparent) 0);
+  border-radius: 50%;
+  display: flex;
+  flex: 0 0 auto;
+  height: 112px;
+  justify-content: center;
+  width: 112px;
+}
+
+.emp-ring b {
+  align-items: center;
+  background: var(--surface);
+  border-radius: 50%;
+  display: flex;
+  font-size: 21px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  height: 84px;
+  justify-content: center;
+  width: 84px;
+}
+
+.emp-ring-legend {
+  display: grid;
+  flex: 1 1 220px;
+  gap: 10px;
+  min-width: 0;
+}
+
+.emp-ring-legend p {
+  color: var(--muted);
+  font-size: var(--type-supporting);
+  margin: 0;
+}
+
+.emp-mini {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.emp-mini > div {
+  background: color-mix(in srgb, var(--input-surface) 60%, transparent);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  display: grid;
+  gap: 1px;
+  padding: 9px 12px;
+}
+
+.emp-mini span {
+  color: var(--muted);
+  font-size: var(--type-compact);
+}
+
+.emp-mini strong {
+  font-size: var(--type-supporting);
+  font-variant-numeric: tabular-nums;
+}
+
+.emp-mini strong.is-attention { color: var(--amber-ink); }
+
+/* Leave: what is left is the headline, the bar is the evidence. */
+.emp-leave { display: grid; gap: 12px; }
+
+.emp-leave-row {
+  align-items: baseline;
+  display: grid;
+  gap: 4px 10px;
+  grid-template-columns: minmax(0, 1fr) 48px;
+}
+
+.emp-leave-row strong { font-size: var(--type-supporting); }
+.emp-leave-row small { color: var(--muted); font-size: var(--type-compact); }
+
+.emp-leave-row b {
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.emp-leave-bar {
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  border-radius: 999px;
+  grid-column: 1 / -1;
+  height: 6px;
+  overflow: hidden;
+}
+
+.emp-leave-bar i {
+  background: var(--accent);
+  border-radius: 999px;
+  display: block;
+  height: 100%;
+}
+
+.emp-leave-row.is-out b { color: var(--red); }
+.emp-leave-row.is-out .emp-leave-bar i { background: var(--red); }
+
+/* Work: what is late leads. */
+.emp-tasks { display: grid; gap: 4px; }
+
+.emp-tasks a {
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  padding: 9px 12px;
+}
+
+.emp-tasks a:hover {
+  background: color-mix(in srgb, var(--input-surface) 70%, transparent);
+  border-color: var(--line);
+}
+
+.emp-tasks i {
+  background: var(--blue);
+  border-radius: 50%;
+  flex: 0 0 auto;
+  height: 8px;
+  width: 8px;
+}
+
+.emp-tasks a.is-late i { background: var(--red); }
+.emp-tasks span { display: grid; gap: 1px; min-width: 0; }
+.emp-tasks strong { font-size: var(--type-supporting); font-weight: 700; }
+.emp-tasks small { color: var(--muted); font-size: var(--type-compact); }
+
+.emp-caps { display: flex; flex-wrap: wrap; gap: 7px; }
+
+.emp-caps span {
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: var(--type-compact);
+  font-weight: 700;
+  padding: 5px 11px;
+}
+
+.emp-caps span.is-sign { background: color-mix(in srgb, var(--mint) 13%, transparent); color: var(--mint-ink, var(--mint)); }
+.emp-caps span.is-review { background: color-mix(in srgb, var(--blue) 12%, transparent); color: var(--blue); }
+
+.emp-alert {
+  color: var(--red);
+  font-size: var(--type-compact);
+  font-weight: 650;
+  margin: 0;
+}
+
+@media (max-width: 1100px) {
+  .emp-card.span-4,
+  .emp-card.span-5,
+  .emp-card.span-7,
+  .emp-card.span-8 {
+    grid-column: span 12;
+  }
+}
+
 /* ---- Employee statutory record ----------------------------------------- */
 
 .employee-compliance {
