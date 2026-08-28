@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import { randomUUID } from "node:crypto";
-import { and, count, eq, inArray, ne } from "drizzle-orm";
+import { and, count, eq, inArray, isNotNull, ne } from "drizzle-orm";
 
 import {
   attendanceDays, attendanceEvents, attendancePeriodSummaries, attendancePeriods, attendancePolicies, auditEvents, employeeBankAccounts,
@@ -11,10 +11,12 @@ import {
   serviceCatalog, servicePackageItems, servicePackages, statutoryRateParameters, statutoryRateVersions,
   dscCertificates, dscCustodyEvents, statutoryNotices,
 } from "../db/schema";
-import { changeRequiredPassword, clearFailedLogins, consumeLoginRateLimit, findLoginIdentity, createSessionRecord, findSessionByTokenHash, recordFailedLogin, revokeSessionByTokenHash } from "../lib/auth/repository";
+import { changePassword, clearFailedLogins, consumeLoginRateLimit, findLoginIdentity, createSessionRecord, findSessionByTokenHash, recordFailedLogin, revokeSessionByTokenHash } from "../lib/auth/repository";
+import { PasswordChangeError } from "../lib/auth/repository";
 import { createSessionToken, hashSessionToken } from "../lib/auth/tokens";
 import { archiveClient, ClientRepositoryError, createClient, getClient360Data, updateClient } from "../lib/clients/repository";
 import { SEEDED_TENANT_ID } from "../lib/dashboard/fixtures";
+import { FIRM_SCOPE, listDirectReports } from "../lib/dashboard/scope";
 import { applyBulkRequestCancel, cancelDocumentRequest, createDocumentRequest, getDocumentMetadata, listDocumentWorkspace, recordDocumentUpload } from "../lib/documents/repository";
 import { mapDashboardRecords } from "../lib/dashboard/mapper";
 import { closePostgresPool, getDatabase, getPostgresPool } from "../lib/dashboard/postgres/pool";
@@ -23,7 +25,7 @@ import { applyBulkWorkChange, completeWorkItem, createWorkItem, getWorkItem360, 
 import { getCapacityLanes, getQueueTotals, listWorkQueue } from "../lib/work/queue";
 import { DEFAULT_WORK_QUEUE_PARAMS } from "../lib/work/queue-params";
 import { getSeedCounts, seedDevelopmentData } from "../scripts/db/seed";
-import { createEmployee, disableEmployee, getEmployee360, listEmployees, provisionEmployeeAccess, TeamRepositoryError, updateEmployee } from "../lib/team/repository";
+import { createEmployee, disableEmployee, expireEmployeePassword, getEmployee360, listEmployees, provisionEmployeeAccess, TeamRepositoryError, updateEmployee } from "../lib/team/repository";
 import { applyBulkTaskChange, completeOfficeTask, createOfficeTask, getTask360, listTaskWorkspace, TaskRepositoryError, updateOfficeTask, updateOwnTaskStatus } from "../lib/tasks/repository";
 import { getTaskCapacityLanes, listTaskQueue } from "../lib/tasks/queue";
 import { DEFAULT_TASK_QUEUE_PARAMS } from "../lib/tasks/queue-params";
@@ -89,7 +91,7 @@ test("development seed is idempotent and loads the expected dashboard rows", asy
     workProfiles: 5,
   });
 
-  const records = await loadDashboardRecords(database, SEEDED_TENANT_ID);
+  const records = await loadDashboardRecords(database, SEEDED_TENANT_ID, FIRM_SCOPE);
   assert.equal(records.clients.length, 5);
   assert.equal(records.workItems.length, 4);
 });
@@ -534,10 +536,11 @@ test("employee lifecycle is tenant-scoped, provisions one-time access, and guard
     await createSessionRecord(database, { membershipId, tokenHash, expiresAt: new Date(Date.now() + 60_000) });
     const temporaryIdentity = await findLoginIdentity(database, `employee-${suffix}@example.invalid`, "sharma-kumar-ca");
     assert.equal(temporaryIdentity?.mustChangePassword, true);
-    await changeRequiredPassword(database, created.userId, temporaryPassword, "Strong replacement 2026!");
+    await changePassword(database, created.userId, temporaryPassword, "Strong replacement 2026!");
     assert.equal(await findSessionByTokenHash(database, tokenHash), null);
     const [changedCredential] = await database.select({ mustChangePassword: userCredentials.mustChangePassword }).from(userCredentials).where(eq(userCredentials.userId, created.userId));
     assert.equal(changedCredential?.mustChangePassword, false);
+
     tokenHash = hashSessionToken(createSessionToken());
     await createSessionRecord(database, { membershipId, tokenHash, expiresAt: new Date(Date.now() + 60_000) });
 
@@ -579,6 +582,207 @@ test("employee lifecycle is tenant-scoped, provisions one-time access, and guard
     await database.delete(employeeProfiles).where(eq(employeeProfiles.id, created.employeeId));
     await database.delete(tenantMemberships).where(and(eq(tenantMemberships.tenantId, identity.tenantId), eq(tenantMemberships.userId, created.userId)));
     await database.delete(users).where(eq(users.id, created.userId));
+  }
+});
+
+/**
+ * Kept apart from the employee lifecycle test above so a failure in one is not
+ * read as a failure in the other: these are credential rules, not joiner rules.
+ */
+test("a password change proves the current one, and expiry keeps it", async () => {
+  const database = getDatabase();
+  const identity = await findLoginIdentity(database, "loukesh@example.invalid", "sharma-kumar-ca");
+  assert.ok(identity);
+  const suffix = randomUUID().slice(0, 8);
+  const created = await createEmployee(database, identity.tenantId, identity.userId, {
+    designation: "Credential Associate",
+    qualification: "other" as const,
+    membershipNumber: "",
+    qualifiedOn: null,
+    email: `credential-${suffix}@example.invalid`,
+    fullName: `Credential ${suffix}`,
+    joiningDate: "2026-08-16",
+    mobileNumber: "",
+    notes: "Credential lifecycle test",
+    roleKey: "associate",
+  });
+  let membershipId = "";
+  try {
+    const temporaryPassword = await provisionEmployeeAccess(database, identity.tenantId, identity.userId, created.employeeId);
+    const [membership] = await database.select({ id: tenantMemberships.id }).from(tenantMemberships).where(and(
+      eq(tenantMemberships.tenantId, identity.tenantId),
+      eq(tenantMemberships.userId, created.userId),
+    ));
+    assert.ok(membership);
+    membershipId = membership.id;
+
+    // Expiry has nothing to work with until a login exists, and never touches
+    // the hash once it does.
+    await changePassword(database, created.userId, temporaryPassword, "Strong replacement 2026!");
+    const [afterChange] = await database.select({ mustChangePassword: userCredentials.mustChangePassword, passwordHash: userCredentials.passwordHash }).from(userCredentials).where(eq(userCredentials.userId, created.userId));
+    assert.equal(afterChange?.mustChangePassword, false);
+
+    await assert.rejects(
+      () => changePassword(database, created.userId, "not the password", "Another strong one 2026!"),
+      (error: unknown) => error instanceof PasswordChangeError && error.code === "invalid_current",
+    );
+    await assert.rejects(
+      () => changePassword(database, created.userId, "Strong replacement 2026!", "Strong replacement 2026!"),
+      (error: unknown) => error instanceof PasswordChangeError && error.code === "invalid_new",
+    );
+
+    const tokenHash = hashSessionToken(createSessionToken());
+    await createSessionRecord(database, { membershipId, tokenHash, expiresAt: new Date(Date.now() + 60_000) });
+    await expireEmployeePassword(database, identity.tenantId, identity.userId, created.employeeId);
+    assert.equal(await findSessionByTokenHash(database, tokenHash), null);
+    const [afterExpiry] = await database.select({ mustChangePassword: userCredentials.mustChangePassword, passwordHash: userCredentials.passwordHash }).from(userCredentials).where(eq(userCredentials.userId, created.userId));
+    assert.equal(afterExpiry?.mustChangePassword, true);
+    assert.equal(afterExpiry?.passwordHash, afterChange?.passwordHash, "expiry must not replace the password the employee knows");
+
+    // The password they already knew still opens the account; they are only
+    // made to replace it.
+    await changePassword(database, created.userId, "Strong replacement 2026!", "Third strong password 2026!");
+  } finally {
+    if (membershipId) await database.delete(userSessions).where(eq(userSessions.membershipId, membershipId));
+    await database.delete(auditEvents).where(eq(auditEvents.resourceId, created.employeeId));
+    await database.delete(userCredentials).where(eq(userCredentials.userId, created.userId));
+    await database.delete(employeeWorkProfiles).where(and(eq(employeeWorkProfiles.tenantId, identity.tenantId), eq(employeeWorkProfiles.employeeUserId, created.userId)));
+    await database.delete(employeeProfiles).where(eq(employeeProfiles.id, created.employeeId));
+    await database.delete(tenantMemberships).where(and(eq(tenantMemberships.tenantId, identity.tenantId), eq(tenantMemberships.userId, created.userId)));
+    await database.delete(users).where(eq(users.id, created.userId));
+  }
+});
+
+test("direct reports are read from the reporting line and stay inside the firm", async () => {
+  const database = getDatabase();
+  const identity = await findLoginIdentity(database, "loukesh@example.invalid", "sharma-kumar-ca");
+  assert.ok(identity);
+
+  const reports = await listDirectReports(database, identity.tenantId, identity.userId);
+  assert.ok(Array.isArray(reports));
+  // Every id returned must belong to a profile in this tenant naming this manager.
+  for (const userId of reports) {
+    const [profile] = await database.select({ managerUserId: employeeWorkProfiles.managerUserId })
+      .from(employeeWorkProfiles)
+      .where(and(eq(employeeWorkProfiles.tenantId, identity.tenantId), eq(employeeWorkProfiles.employeeUserId, userId)));
+    assert.equal(profile?.managerUserId, identity.userId);
+  }
+
+  // A manager id from no firm has no reports anywhere.
+  assert.deepEqual(await listDirectReports(database, identity.tenantId, randomUUID()), []);
+
+  // A manager id matching no row proves nothing about the tenant clause — it
+  // returns [] whether or not that clause exists. Prove it with a manager who
+  // really does have reports in this tenant, looked up under a foreign one.
+  const [existingManager] = await database.select({ managerUserId: employeeWorkProfiles.managerUserId })
+    .from(employeeWorkProfiles)
+    .where(and(eq(employeeWorkProfiles.tenantId, identity.tenantId), isNotNull(employeeWorkProfiles.managerUserId)))
+    .limit(1);
+
+  let realManagerId = existingManager?.managerUserId ?? null;
+  let plantedUserId = "";
+  if (!realManagerId) {
+    // The seed changed shape and no longer has a manager/report pair; plant
+    // one under the real tenant so the assertion still proves something.
+    realManagerId = identity.userId;
+    plantedUserId = randomUUID();
+    await database.insert(users).values({ id: plantedUserId, email: `direct-report-${plantedUserId}@example.invalid`, fullName: "Planted Direct Report" });
+    await database.insert(tenantMemberships).values({ id: randomUUID(), tenantId: identity.tenantId, userId: plantedUserId, roleKey: "associate", status: "active" });
+    await database.insert(employeeWorkProfiles).values({
+      id: randomUUID(), tenantId: identity.tenantId, employeeUserId: plantedUserId, managerUserId: realManagerId,
+      employmentType: "employee", workLocationState: "Bihar",
+    });
+  }
+
+  try {
+    const realTenantReports = await listDirectReports(database, identity.tenantId, realManagerId);
+    assert.ok(realTenantReports.length > 0, "the chosen manager id must actually have direct reports in its own tenant");
+    assert.deepEqual(await listDirectReports(database, FOREIGN_TENANT_ID, realManagerId), []);
+  } finally {
+    if (plantedUserId) {
+      await database.delete(employeeWorkProfiles).where(and(eq(employeeWorkProfiles.tenantId, identity.tenantId), eq(employeeWorkProfiles.employeeUserId, plantedUserId)));
+      await database.delete(tenantMemberships).where(and(eq(tenantMemberships.tenantId, identity.tenantId), eq(tenantMemberships.userId, plantedUserId)));
+      await database.delete(users).where(eq(users.id, plantedUserId));
+    }
+  }
+});
+
+test("dashboard records narrow to the scope they are loaded with", async () => {
+  const database = getDatabase();
+  const identity = await findLoginIdentity(database, "loukesh@example.invalid", "sharma-kumar-ca");
+  assert.ok(identity);
+
+  const firm = await loadDashboardRecords(database, identity.tenantId, FIRM_SCOPE);
+  assert.ok(firm.workItems.length > 0, "the seeded firm has work to scope");
+
+  // Nobody's own scope may exceed the firm's, and every item it returns must be
+  // one the firm load also returned.
+  const assignees = await database.select({ assigneeId: workItems.assigneeId })
+    .from(workItems).where(eq(workItems.tenantId, identity.tenantId));
+  const someAssignee = assignees.map((row) => row.assigneeId).find((id): id is string => Boolean(id));
+  assert.ok(someAssignee, "the seeded firm has an assigned work item");
+
+  const own = await loadDashboardRecords(database, identity.tenantId, { kind: "own", userId: someAssignee });
+  assert.ok(own.workItems.length > 0);
+  assert.ok(own.workItems.length <= firm.workItems.length);
+  const firmIds = new Set(firm.workItems.map((item) => item.id));
+  for (const item of own.workItems) assert.ok(firmIds.has(item.id));
+
+  // The client list follows the work, so it can never name an entity the
+  // viewer has no work against.
+  const ownEntityIds = new Set(own.workItems.map((item) => item.legalEntityId));
+  for (const client of own.clients) assert.ok(ownEntityIds.has(client.id));
+
+  // A scope naming nobody returns no work at all, and never falls back to the firm.
+  const stranger = await loadDashboardRecords(database, identity.tenantId, { kind: "own", userId: randomUUID() });
+  assert.equal(stranger.workItems.length, 0);
+  assert.equal(stranger.clients.length, 0);
+
+  // A team scope is the union of its members, so it contains the own scope.
+  const team = await loadDashboardRecords(database, identity.tenantId, { kind: "team", userIds: [someAssignee] });
+  assert.equal(team.workItems.length, own.workItems.length);
+
+  // The members list is not scoped: it supplies names, not business data.
+  assert.equal(own.members.length, firm.members.length);
+
+  // No seeded work item has a reviewer, so the reviewer arm of
+  // scopedWorkFilter is never otherwise exercised: an own scope must also see
+  // work the viewer only reviews, not just work they are assigned. Plant one,
+  // reusing an existing entity and an existing member so no client graph or
+  // new user is needed.
+  const existingWorkItems = await database.select({ id: workItems.id, legalEntityId: workItems.legalEntityId, assigneeId: workItems.assigneeId })
+    .from(workItems).where(eq(workItems.tenantId, identity.tenantId));
+  assert.ok(existingWorkItems.length > 0);
+  const reviewerUserId = identity.userId;
+  // An item reviewerUserId is not already tied to, to prove their own scope
+  // stays narrow and does not simply return everything.
+  const unrelatedItem = existingWorkItems.find((item) => item.assigneeId !== reviewerUserId);
+  assert.ok(unrelatedItem, "need an existing item the reviewer fixture is not already assigned to");
+
+  const reviewFixtureId = randomUUID();
+  await database.insert(workItems).values({
+    id: reviewFixtureId,
+    tenantId: identity.tenantId,
+    legalEntityId: existingWorkItems[0]!.legalEntityId,
+    serviceKey: "scope-test-review-service",
+    periodKey: "scope-test-review-period",
+    status: "at_risk",
+    statutoryDueDate: "2031-01-01",
+    assigneeId: null,
+    reviewerId: reviewerUserId,
+  });
+  try {
+    const reviewerScope = await loadDashboardRecords(database, identity.tenantId, { kind: "own", userId: reviewerUserId });
+    assert.ok(
+      reviewerScope.workItems.some((item) => item.id === reviewFixtureId),
+      "own scope must include work the viewer only reviews",
+    );
+    assert.ok(
+      !reviewerScope.workItems.some((item) => item.id === unrelatedItem!.id),
+      "own scope must not include work the viewer neither owns nor reviews",
+    );
+  } finally {
+    await database.delete(workItems).where(eq(workItems.id, reviewFixtureId));
   }
 });
 
@@ -968,7 +1172,7 @@ test("compliance work lifecycle is tenant-scoped, audited, and completed outside
     assert.equal(completed?.status, "completed");
     assert.equal(completed?.progress, 100);
     assert.equal(completed?.missingItemCount, 0);
-    const dashboard = mapDashboardRecords(await loadDashboardRecords(database, identity.tenantId), new Date("2026-08-16T09:00:00+05:30"), "postgres");
+    const dashboard = mapDashboardRecords(await loadDashboardRecords(database, identity.tenantId, FIRM_SCOPE), new Date("2026-08-16T09:00:00+05:30"), "postgres");
     assert.equal(dashboard.work.some((item) => item.id === workItemId), false);
     assert.ok(dashboard.metrics.completed >= 1);
 

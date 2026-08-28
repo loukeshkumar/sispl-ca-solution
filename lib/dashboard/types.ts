@@ -86,6 +86,11 @@ export type DashboardData = {
   generatedAt: string;
   todayKey: string;
   titleDate: string;
+  /**
+   * How much of the firm this data covers. Absent on the demo path, which is
+   * always firm-wide, so the fixtures need no change.
+   */
+  scope?: { kind: "firm" | "team" | "own"; hasReports: boolean };
   practice: {
     name: string;
     legalName: string;

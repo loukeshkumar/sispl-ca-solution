@@ -23,7 +23,7 @@ import { buildExitClearance } from "./offboarding-repository";
 import type { EmployeeInput } from "./validation";
 
 export class TeamRepositoryError extends Error {
-  constructor(public readonly code: "not_found" | "duplicate_email" | "active_tasks" | "self_disable" | "shared_identity" | "invalid_role" | "role_forbidden" | "protected_super_admin" | "self_role_change" | "clearance_blocked" | "clearance_reason" | "invalid_stage") {
+  constructor(public readonly code: "not_found" | "duplicate_email" | "active_tasks" | "self_disable" | "shared_identity" | "invalid_role" | "role_forbidden" | "protected_super_admin" | "self_role_change" | "clearance_blocked" | "clearance_reason" | "invalid_stage" | "no_login") {
     super({
       not_found: "Employee not found.",
       duplicate_email: "An account already uses this email address.",
@@ -37,6 +37,7 @@ export class TeamRepositoryError extends Error {
       clearance_blocked: "This employee still holds signing custody or open delivery work. Clear those items before disabling the account.",
       clearance_reason: "Some exit items are outstanding. Record why the firm is proceeding anyway.",
       invalid_stage: "Choose a valid employment stage and a date on or after the joining date.",
+      no_login: "This employee has no login yet. Generate a temporary password instead.",
     }[code]);
     this.name = "TeamRepositoryError";
   }
@@ -259,6 +260,33 @@ export async function provisionEmployeeAccess(database: DashboardDatabase, tenan
     await transaction.insert(auditEvents).values({ tenantId, actorUserId, resourceType: "employee", resourceId: employeeId, action: "employee.access_provisioned" });
   });
   return temporaryPassword;
+}
+
+/**
+ * Require a new password at the next sign-in without issuing one.
+ *
+ * The difference from provisioning is what the person is left holding: a reset
+ * hands them a temporary password somebody has to deliver, while expiry leaves
+ * the password they already know and only refuses to let them keep it. Sessions
+ * still go, so the requirement cannot be outrun by staying signed in.
+ */
+export async function expireEmployeePassword(database: DashboardDatabase, tenantId: string, actorUserId: string, employeeId: string) {
+  await database.transaction(async (transaction) => {
+    const [actor] = await transaction.select({ accessClass: tenantMemberships.accessClass }).from(tenantMemberships).where(and(eq(tenantMemberships.tenantId, tenantId), eq(tenantMemberships.userId, actorUserId), eq(tenantMemberships.status, "active"))).limit(1);
+    const [employee] = await transaction.select({ userId: employeeProfiles.userId, membershipId: tenantMemberships.id, accessClass: tenantMemberships.accessClass }).from(employeeProfiles)
+      .innerJoin(tenantMemberships, and(eq(tenantMemberships.tenantId, tenantId), eq(tenantMemberships.userId, employeeProfiles.userId)))
+      .where(and(eq(employeeProfiles.id, employeeId), eq(employeeProfiles.tenantId, tenantId), eq(tenantMemberships.status, "active"))).limit(1);
+    if (!employee) throw new TeamRepositoryError("not_found");
+    if (employee.accessClass === "super_admin") throw new TeamRepositoryError("protected_super_admin");
+    if (employee.accessClass === "admin" && actor?.accessClass !== "super_admin") throw new TeamRepositoryError("role_forbidden");
+    await assertExclusiveIdentity(transaction, employee.userId);
+    // Nothing to expire on an account that was never given a login.
+    const [expired] = await transaction.update(userCredentials).set({ mustChangePassword: true })
+      .where(eq(userCredentials.userId, employee.userId)).returning({ userId: userCredentials.userId });
+    if (!expired) throw new TeamRepositoryError("no_login");
+    await transaction.update(userSessions).set({ revokedAt: new Date() }).where(and(eq(userSessions.membershipId, employee.membershipId), sql`${userSessions.revokedAt} is null`));
+    await transaction.insert(auditEvents).values({ tenantId, actorUserId, resourceType: "employee", resourceId: employeeId, action: "employee.password_expired" });
+  });
 }
 
 /**

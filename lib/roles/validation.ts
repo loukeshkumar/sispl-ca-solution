@@ -8,6 +8,9 @@ export type RoleDefinitionInput = {
   permissions: Permission[];
   roleClass: ManagedRoleClass;
 };
+/** What the people register shows after a credential action. */
+export type MemberAccessState = { error: string; employeeId?: string; expired?: boolean; temporaryPassword?: string };
+
 export type RoleDefinitionActionState = {
   error: string;
   fieldErrors: Partial<Record<"description" | "legacyRoleKey" | "name" | "permissions" | "roleClass", string>>;

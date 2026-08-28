@@ -140,6 +140,14 @@ export function OverviewWorkspace({
         eyebrow={`${data.source === "postgres" ? "LOCAL DATABASE" : "DEMO"} · ${data.titleDate}`}
         title={title}
       />
+      {data.scope?.kind === "team" && !data.scope.hasReports && (
+        <p className="scope-notice" role="status">
+          This dashboard covers you and your direct reports, and nobody reports to you yet.
+          {" "}
+          An administrator sets reporting lines on each employee&rsquo;s work profile, under{" "}
+          <Link href="/?workspace=attendance">Attendance &rarr; Setup</Link>.
+        </p>
+      )}
       <OverviewKpis data={data} filter={filter} onFilterChange={onFilterChange} onOpenMyWork={onOpenMyWork} />
       <OverviewAnalytics data={data} />
       <TodoWidget workspace={todos} />

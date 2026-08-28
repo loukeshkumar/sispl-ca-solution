@@ -1,4 +1,4 @@
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, or, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 import {
@@ -13,6 +13,7 @@ import {
   workItems,
 } from "../../../db/schema";
 import * as schema from "../../../db/schema";
+import { scopedUserIds, type DashboardScope } from "../scope";
 import type { DashboardRecords } from "../types";
 
 export type DashboardDatabase = NodePgDatabase<typeof schema>;
@@ -27,11 +28,39 @@ export async function findTenantIdBySlug(database: DashboardDatabase, tenantSlug
   return tenant?.id ?? null;
 }
 
+/**
+ * The work a scope selects: items the scoped users are assigned or reviewing.
+ * Reviewing an item is holding it, so both columns count. `undefined` means no
+ * predicate, which `and()` drops.
+ */
+function scopedWorkFilter(scope: DashboardScope) {
+  const userIds = scopedUserIds(scope);
+  if (!userIds) return undefined;
+  // An empty scope must select nothing rather than everything.
+  if (userIds.length === 0) return sql`false`;
+  return or(inArray(workItems.assigneeId, userIds), inArray(workItems.reviewerId, userIds));
+}
+
 export async function loadDashboardRecords(
   database: DashboardDatabase,
   tenantId: string,
+  scope: DashboardScope,
 ): Promise<DashboardRecords> {
   if (!tenantId.trim()) throw new Error("tenantId is required.");
+
+  const workFilter = scopedWorkFilter(scope);
+  /*
+   * Clients follow the work rather than being scoped separately, so the client
+   * list can never name an entity whose work the viewer cannot see. A subquery
+   * rather than a second round trip, so both queries still run in parallel.
+   */
+  const entityFilter = workFilter
+    ? inArray(
+        legalEntities.id,
+        database.select({ id: workItems.legalEntityId }).from(workItems)
+          .where(and(eq(workItems.tenantId, tenantId), workFilter)),
+      )
+    : undefined;
 
   const [tenantRows, memberRows, clientRows, serviceRows, registrationRows, workRows] = await Promise.all([
     database.select({
@@ -64,7 +93,7 @@ export async function loadDashboardRecords(
     }).from(legalEntities)
       .innerJoin(clientGroups, and(eq(clientGroups.id, legalEntities.clientGroupId), eq(clientGroups.tenantId, tenantId)))
       .leftJoin(users, eq(users.id, clientGroups.relationshipOwnerId))
-      .where(and(eq(legalEntities.tenantId, tenantId), eq(legalEntities.status, "active")))
+      .where(and(eq(legalEntities.tenantId, tenantId), eq(legalEntities.status, "active"), entityFilter))
       .orderBy(asc(legalEntities.legalName)),
     database.select({
       legalEntityId: clientServices.legalEntityId,
@@ -94,7 +123,7 @@ export async function loadDashboardRecords(
       .innerJoin(legalEntities, and(eq(legalEntities.id, workItems.legalEntityId), eq(legalEntities.tenantId, tenantId)))
       .leftJoin(serviceCatalog, and(eq(serviceCatalog.tenantId, tenantId), sql`lower(${serviceCatalog.code}) = lower(${workItems.serviceKey})`))
       .leftJoin(users, eq(users.id, workItems.assigneeId))
-      .where(and(eq(workItems.tenantId, tenantId), eq(legalEntities.status, "active")))
+      .where(and(eq(workItems.tenantId, tenantId), eq(legalEntities.status, "active"), workFilter))
       .orderBy(asc(workItems.statutoryDueDate)),
   ]);
 

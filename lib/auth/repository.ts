@@ -232,17 +232,28 @@ export async function revokeSessionByTokenHash(
 }
 
 export class PasswordChangeError extends Error {
-  constructor(public readonly code: "not_required" | "invalid_current" | "invalid_new") {
+  constructor(public readonly code: "no_credential" | "invalid_current" | "invalid_new") {
     super({
-      not_required: "A password change is not required for this account.",
-      invalid_current: "The temporary password is incorrect.",
+      no_credential: "This account has no login to change.",
+      invalid_current: "The current password is incorrect.",
       invalid_new: "Choose a different password containing between 12 and 128 characters.",
     }[code]);
     this.name = "PasswordChangeError";
   }
 }
 
-export async function changeRequiredPassword(
+/**
+ * Replace a password the holder knows.
+ *
+ * Serves both the forced first sign-in and a voluntary change, because the two
+ * differ only in what sent the person here: either way the current password is
+ * proved, the new one may not repeat it, and every session is revoked so a
+ * stolen cookie does not outlive the password it was issued against.
+ *
+ * The update is conditional on the hash it read, so two concurrent changes
+ * cannot both report success.
+ */
+export async function changePassword(
   database: DashboardDatabase,
   userId: string,
   currentPassword: string,
@@ -250,9 +261,8 @@ export async function changeRequiredPassword(
 ) {
   const [credential] = await database.select({
     passwordHash: userCredentials.passwordHash,
-    mustChangePassword: userCredentials.mustChangePassword,
   }).from(userCredentials).where(eq(userCredentials.userId, userId)).limit(1);
-  if (!credential?.mustChangePassword) throw new PasswordChangeError("not_required");
+  if (!credential) throw new PasswordChangeError("no_credential");
   if (!await verifyPassword(currentPassword, credential.passwordHash)) throw new PasswordChangeError("invalid_current");
   if (validateNewPassword(newPassword) || await verifyPassword(newPassword, credential.passwordHash)) {
     throw new PasswordChangeError("invalid_new");
@@ -265,8 +275,11 @@ export async function changeRequiredPassword(
       failedLoginAttempts: 0,
       lockedUntil: null,
       passwordChangedAt: new Date(),
-    }).where(and(eq(userCredentials.userId, userId), eq(userCredentials.mustChangePassword, true))).returning({ userId: userCredentials.userId });
-    if (!changed) throw new PasswordChangeError("not_required");
+    }).where(and(
+      eq(userCredentials.userId, userId),
+      eq(userCredentials.passwordHash, credential.passwordHash),
+    )).returning({ userId: userCredentials.userId });
+    if (!changed) throw new PasswordChangeError("invalid_current");
     const memberships = await transaction.select({ id: tenantMemberships.id }).from(tenantMemberships).where(eq(tenantMemberships.userId, userId));
     if (memberships.length) {
       await transaction.update(userSessions).set({ revokedAt: new Date() }).where(and(

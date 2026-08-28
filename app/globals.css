@@ -232,22 +232,6 @@
 
 .role-class-panel,
 .role-scope-panel { display: grid; grid-template-columns: minmax(15rem, .55fr) minmax(24rem, 1fr); gap: 2rem; }
-.role-class-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; }
-.role-class-options label { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: .25rem .65rem; min-height: 6.2rem; padding: 1rem; border: 1px solid var(--border); border-radius: 1rem; background: var(--surface-soft); cursor: pointer; transition: all .2s ease; }
-.role-class-options label:hover,
-.role-class-options label.is-selected { border-color: color-mix(in srgb, var(--accent) 65%, var(--border)); background: color-mix(in srgb, var(--accent) 9%, var(--surface)); transform: translateY(-1px); }
-.role-class-options input { position: absolute; opacity: 0; }
-.role-class-options label > span { grid-row: span 2; display: grid; place-items: center; width: 2.4rem; height: 2.4rem; color: var(--accent-strong); border-radius: .75rem; background: color-mix(in srgb, var(--accent) 13%, var(--surface)); }
-.role-class-options svg { width: 1.05rem; }
-.role-class-options strong { font-size: var(--type-primary); }
-.role-class-options small { color: var(--muted); font-size: var(--type-compact); line-height: 1.35; }
-
-.role-scope-options { display: grid; gap: .55rem; }
-.role-scope-options label { display: flex; align-items: center; gap: .75rem; padding: .8rem .9rem; border: 1px solid var(--border); border-radius: .85rem; background: var(--surface-soft); cursor: pointer; }
-.role-scope-options input { width: 1rem; height: 1rem; accent-color: var(--accent); }
-.role-scope-options span { display: grid; gap: .15rem; }
-.role-scope-options strong { font-size: var(--type-supporting); }
-.role-scope-options small { color: var(--muted); font-size: var(--type-compact); line-height: 1.35; }
 
 .role-permission-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1.5rem; }
 .role-change-summary { display: grid; min-width: 9.5rem; padding: .8rem .95rem; border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--border)); border-radius: .9rem; background: color-mix(in srgb, var(--accent) 7%, var(--surface)); }
@@ -255,26 +239,10 @@
 .role-change-summary span { color: var(--muted); font-size: var(--type-compact); }
 .role-change-summary small { display: flex; align-items: center; gap: .25rem; margin-top: .3rem; color: var(--warning-text); font-size: var(--type-compact); }
 .role-change-summary svg { width: .8rem; }
-.permission-groups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .85rem; margin-top: 1.25rem; }
-.permission-groups fieldset { min-width: 0; padding: .8rem; border: 1px solid var(--border); border-radius: 1rem; background: color-mix(in srgb, var(--surface-soft) 78%, transparent); }
-.permission-groups legend { padding: 0 .35rem; color: var(--muted); font-size: var(--type-label); font-weight: 850; letter-spacing: .09em; text-transform: uppercase; }
-.permission-groups fieldset > div { display: grid; gap: .45rem; }
-.permission-groups label { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: .7rem; padding: .72rem; border: 1px solid transparent; border-radius: .8rem; cursor: pointer; transition: all .2s ease; }
-.permission-groups label:hover { background: var(--surface); }
-.permission-groups label.is-selected { border-color: color-mix(in srgb, var(--accent) 25%, var(--border)); background: color-mix(in srgb, var(--accent) 7%, var(--surface)); }
-.permission-groups label > input[type="checkbox"] { position: absolute; opacity: 0; }
-.permission-check { display: grid; place-items: center; width: 1.3rem; height: 1.3rem; color: #052e2b; border: 1px solid var(--border); border-radius: .38rem; background: var(--surface); }
-.is-selected > .permission-check { border-color: var(--accent); background: var(--accent); }
-.permission-check svg { width: .8rem; stroke-width: 3; }
-.permission-groups label > span:last-child { display: grid; gap: .18rem; }
-.permission-groups label strong { display: flex; align-items: center; justify-content: space-between; gap: .5rem; font-size: var(--type-supporting); }
-.permission-groups label strong em { padding: .18rem .38rem; color: var(--warning-text); border-radius: 999px; background: color-mix(in srgb, var(--warning) 14%, transparent); font-size: var(--type-compact); font-style: normal; text-transform: uppercase; }
-.permission-groups label small { color: var(--muted); font-size: var(--type-compact); line-height: 1.35; }
 .role-editor-actions { position: sticky; z-index: 3; bottom: .75rem; display: flex; justify-content: flex-end; gap: .65rem; padding: .8rem; border: 1px solid var(--border); border-radius: 1rem; background: color-mix(in srgb, var(--surface) 82%, transparent); -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); box-shadow: 0 15px 45px rgb(15 23 42 / .12); }
 
 @media (max-width: 1050px) {
-  .role-register-grid,
-  .permission-groups { grid-template-columns: 1fr; }
+  .role-register-grid { grid-template-columns: 1fr; }
   .role-editor-overview,
   .role-class-panel,
   .role-scope-panel { grid-template-columns: 1fr; gap: 1.2rem; }
@@ -285,7 +253,6 @@
   .super-admin-lock { grid-column: 1 / -1; width: 100%; }
   .role-register-list > article { grid-template-columns: minmax(0, 1fr) auto; }
   .role-register-stats { grid-column: 1 / -1; justify-content: flex-start; padding-left: 3.25rem; }
-  .role-class-options { grid-template-columns: 1fr; }
   .role-permission-heading { display: grid; }
   .role-change-summary { width: 100%; }
   .role-editor-form .surface-card { padding: 1rem; }
@@ -653,6 +620,38 @@ input:focus-visible {
 
 .account-signout:hover {
   color: #fff;
+}
+
+/* Two account controls now share the slot the sign-out button used to hold. */
+.account-controls {
+  align-items: flex-end;
+  display: grid;
+  gap: 2px;
+  justify-items: end;
+}
+
+.account-password {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: var(--sidebar-support);
+  cursor: pointer;
+  display: flex;
+  font-family: inherit;
+  font-size: var(--type-compact);
+  font-weight: 700;
+  gap: 5px;
+  padding: 4px 2px;
+  white-space: nowrap;
+}
+
+.account-password:hover {
+  color: #fff;
+}
+
+.account-password svg {
+  height: 13px;
+  width: 13px;
 }
 
 .login-shell {
@@ -2205,7 +2204,7 @@ button.kpi-card[aria-pressed="true"] {
   .dashboard-sidebar .practice-health-card p,
   .dashboard-sidebar .practice-health-progress,
   .dashboard-sidebar .account-summary > span:nth-child(2),
-  .dashboard-sidebar .account-summary > form,
+  .dashboard-sidebar .account-summary > .account-controls,
   .dashboard-sidebar .account-summary > .icon-button,
   .sidebar-close {
     display: grid;
@@ -8499,6 +8498,25 @@ button.kpi-card[aria-pressed="true"] {
   width: min(880px, 100%);
 }
 
+/* Entrance only. Closing is immediate, so a dismissal never feels held back. */
+@media (prefers-reduced-motion: no-preference) {
+  .form-dialog[open] .form-dialog-panel {
+    animation: form-dialog-rise .2s cubic-bezier(.22, .8, .3, 1);
+  }
+
+  .form-dialog[open]::backdrop {
+    animation: form-dialog-fade .2s ease;
+  }
+}
+
+@keyframes form-dialog-rise {
+  from { opacity: 0; transform: translateY(10px) scale(.985); }
+}
+
+@keyframes form-dialog-fade {
+  from { opacity: 0; }
+}
+
 .form-dialog-header {
   align-items: start;
   border-bottom: 1px solid var(--line);
@@ -8546,11 +8564,26 @@ button.kpi-card[aria-pressed="true"] {
   min-height: 0;
 }
 
+/*
+ * The two `local` layers are painted in the surface colour and scroll with the
+ * content, so they cover the two `scroll` shadows whenever the body is already
+ * at that end. The result is a shadow that appears only when there is more to
+ * read — a scroll affordance with no JavaScript and no scroll listener.
+ */
 .form-dialog-body {
+  background:
+    linear-gradient(var(--surface), transparent 70%) top / 100% 20px no-repeat local,
+    linear-gradient(transparent, var(--surface) 70%) bottom / 100% 20px no-repeat local,
+    radial-gradient(farthest-side at 50% 0, color-mix(in srgb, var(--ink) 16%, transparent), transparent) top / 100% 8px no-repeat scroll,
+    radial-gradient(farthest-side at 50% 100%, color-mix(in srgb, var(--ink) 16%, transparent), transparent) bottom / 100% 8px no-repeat scroll,
+    var(--surface);
   display: grid;
   gap: 14px;
+  overflow-x: hidden;
   overflow-y: auto;
   padding: 20px 24px;
+  scrollbar-color: color-mix(in srgb, var(--ink) 22%, transparent) transparent;
+  scrollbar-width: thin;
 }
 
 .form-dialog-body.is-columns-2 {
@@ -8573,7 +8606,9 @@ button.kpi-card[aria-pressed="true"] {
   font-weight: 750;
 }
 
-.form-dialog-body input:not([type="checkbox"]),
+/* Radios and hidden inputs are excluded: the control-sized box is for text
+   fields, and applying it to a radio inflates it into a 44px blob. */
+.form-dialog-body input:not([type="checkbox"], [type="radio"], [type="hidden"]),
 .form-dialog-body select,
 .form-dialog-body textarea {
   background: var(--input-surface);
@@ -8709,53 +8744,553 @@ button.row-action-link {
   margin-right: auto;
 }
 
+/* ---- Access role dialog ----------------------------------------------
+   Scoped to the role dialog: an identity row, two card pickers that share
+   .role-option, and a permission matrix with its own sticky filter bar. */
+
 .role-dialog-grid {
   display: grid;
   gap: 14px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.role-dialog-fieldset {
+/* Sections read as steps, separated by a hairline rather than by guesswork. */
+.role-dialog-section {
   border: 0;
   display: grid;
   gap: 10px;
   margin: 0;
+  min-width: 0;
   padding: 0;
 }
 
-.role-dialog-fieldset > legend {
-  align-items: center;
+.role-dialog-section + .role-dialog-section {
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+}
+
+.role-dialog-section > legend {
+  align-items: baseline;
   color: var(--ink);
   display: flex;
   flex-wrap: wrap;
   font-size: var(--type-supporting);
   font-weight: 750;
-  gap: 12px;
+  gap: 10px;
   justify-content: space-between;
   padding: 0;
   width: 100%;
 }
 
-.role-dialog-count {
-  align-items: center;
+.role-section-hint {
   color: var(--muted);
+  font-size: var(--type-compact);
+  font-weight: 600;
+}
+
+/* ---- Card pickers ---- */
+
+.role-class-options,
+.role-scope-options {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+}
+
+.role-option {
+  align-content: start;
+  background: var(--input-surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  cursor: pointer;
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px 14px;
+  position: relative;
+  transition: background .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+
+/* The real control carries the state; the card is what the user actually sees. */
+.role-option input {
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+}
+
+.role-option:hover {
+  background: var(--surface);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+}
+
+.role-option.is-selected,
+.role-option:has(input:checked) {
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.role-option:has(input:focus-visible) {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.role-option:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: .62;
+}
+
+.role-option-head {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.role-option-icon {
+  align-items: center;
+  background: color-mix(in srgb, var(--accent) 15%, var(--surface));
+  border-radius: 10px;
+  color: var(--accent-strong);
+  display: flex;
+  height: 32px;
+  justify-content: center;
+  width: 32px;
+}
+
+.role-option-icon svg {
+  height: 16px;
+  width: 16px;
+}
+
+.role-option-mark {
+  border: 2px solid color-mix(in srgb, var(--ink) 30%, transparent);
+  border-radius: 50%;
+  flex: 0 0 auto;
+  height: 18px;
+  transition: background .18s ease, border-color .18s ease;
+  width: 18px;
+}
+
+.role-option.is-selected .role-option-mark,
+.role-option:has(input:checked) .role-option-mark {
+  background: radial-gradient(circle, var(--accent) 0 45%, transparent 47%);
+  border-color: var(--accent);
+}
+
+.role-option strong {
+  font-size: var(--type-primary);
+  line-height: 1.3;
+}
+
+.role-option small {
+  color: var(--muted);
+  font-size: var(--type-compact);
+  line-height: 1.4;
+}
+
+/* ---- Permission matrix ---- */
+
+/* Sticks to the top of the scrolling body, so the count and the filter stay
+   reachable however far down the matrix the user has scrolled. The negative
+   inline margin lets the bar cover the body's own side padding. */
+.role-permission-bar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  gap: 10px;
+  margin-inline: -24px;
+  padding: 10px 24px 12px;
+  position: sticky;
+  top: -20px;
+  z-index: 2;
+}
+
+.role-permission-title {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.role-permission-title h3 {
+  font-size: var(--type-supporting);
+  font-weight: 750;
+  margin: 0;
+}
+
+.role-permission-counts {
+  align-items: center;
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.role-count-pill,
+.role-risk-pill {
+  align-items: center;
+  border-radius: 999px;
   display: inline-flex;
   font-size: var(--type-compact);
   font-weight: 700;
-  gap: 10px;
+  gap: 5px;
+  padding: 4px 10px;
+  white-space: nowrap;
 }
 
-.role-dialog-count i {
+.role-count-pill {
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+  color: var(--muted);
+}
+
+.role-count-pill b {
+  color: var(--ink);
+}
+
+.role-risk-pill {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--amber-ink);
+}
+
+.role-risk-pill svg {
+  height: 13px;
+  width: 13px;
+}
+
+.role-permission-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.role-permission-search {
   align-items: center;
-  color: var(--amber-ink, var(--amber));
-  display: inline-flex;
-  font-style: normal;
-  gap: 4px;
+  display: flex;
+  flex: 1 1 220px;
+  position: relative;
 }
 
-.role-dialog-count svg {
+.role-permission-search > svg {
+  color: var(--muted);
+  height: 15px;
+  left: 12px;
+  pointer-events: none;
+  position: absolute;
+  width: 15px;
+}
+
+.form-dialog-body .role-permission-search input {
+  border-radius: 10px;
+  min-height: 38px;
+  padding: 0 34px;
+}
+
+.role-permission-search input::-webkit-search-cancel-button {
+  appearance: none;
+}
+
+.role-search-clear {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  height: 26px;
+  justify-content: center;
+  position: absolute;
+  right: 6px;
+  width: 26px;
+}
+
+.role-search-clear:hover {
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  color: var(--ink);
+}
+
+.role-search-clear svg {
   height: 14px;
   width: 14px;
+}
+
+.role-permission-bulk {
+  display: flex;
+  gap: 6px;
+}
+
+.role-permission-bulk button {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--type-compact);
+  font-weight: 700;
+  min-height: 38px;
+  padding: 0 12px;
+  transition: background .16s ease, border-color .16s ease, color .16s ease;
+  white-space: nowrap;
+}
+
+.role-permission-bulk button:hover {
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+  border-color: var(--accent);
+  color: var(--accent-strong);
+}
+
+/* One list, not a wall of cards: each module is a collapsible node and its
+   permissions hang off a guide rail beneath it. */
+.permission-tree {
+  background: color-mix(in srgb, var(--input-surface) 55%, transparent);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+
+.permission-node + .permission-node {
+  border-top: 1px solid var(--line);
+}
+
+.permission-node-head {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  padding: 6px 12px;
+}
+
+.permission-node-toggle {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  flex: 1 1 auto;
+  font: inherit;
+  font-size: var(--type-label);
+  font-weight: 850;
+  gap: 8px;
+  letter-spacing: .08em;
+  min-height: 32px;
+  min-width: 0;
+  padding: 0;
+  text-align: left;
+  text-transform: uppercase;
+  transition: color .16s ease;
+}
+
+.permission-node-toggle:hover {
+  color: var(--ink);
+}
+
+.permission-node-toggle svg {
+  flex: 0 0 auto;
+  height: 14px;
+  transition: transform .18s ease;
+  width: 14px;
+}
+
+.is-open > .permission-node-head .permission-node-toggle svg {
+  transform: rotate(90deg);
+}
+
+.permission-node-count {
+  color: var(--muted);
+  font-size: var(--type-compact);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.permission-node-select {
+  cursor: pointer;
+  display: flex;
+  position: relative;
+}
+
+.permission-node-select input {
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+}
+
+.permission-node-select:has(input:disabled) {
+  cursor: default;
+  opacity: .55;
+}
+
+.permission-node-select:has(input:focus-visible) .permission-check,
+.permission-leaf:has(input:focus-visible) {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* The rail is the tree: a line down the module and a tick out to each leaf.
+   Each row draws its own segment so the rail stops at the last tick rather
+   than running on past it. */
+.permission-node-children {
+  display: grid;
+  gap: 2px;
+  margin: 0 12px 8px 21px;
+  padding-left: 11px;
+}
+
+.permission-leaf {
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  column-gap: 12px;
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: auto minmax(0, 13.5rem) minmax(0, 1fr);
+  padding: 6px 10px;
+  position: relative;
+  transition: background .16s ease, border-color .16s ease;
+}
+
+.permission-leaf::before,
+.permission-leaf::after {
+  background: color-mix(in srgb, var(--ink) 15%, transparent);
+  content: "";
+  left: -11px;
+  position: absolute;
+}
+
+.permission-leaf::before {
+  bottom: -3px;
+  top: -3px;
+  width: 1px;
+}
+
+.permission-leaf:last-child::before {
+  bottom: 50%;
+}
+
+.permission-leaf::after {
+  height: 1px;
+  top: 50%;
+  width: 9px;
+}
+
+.permission-leaf input {
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+}
+
+.permission-leaf:hover {
+  background: var(--surface);
+}
+
+.permission-leaf.is-selected {
+  background: color-mix(in srgb, var(--accent) 9%, var(--surface));
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--line));
+}
+
+.permission-leaf.is-locked {
+  cursor: default;
+}
+
+.permission-leaf-name {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  font-size: var(--type-supporting);
+  font-weight: 750;
+  gap: 4px 8px;
+  line-height: 1.35;
+  min-height: 20px;
+}
+
+.permission-leaf small {
+  color: var(--muted);
+  font-size: var(--type-compact);
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.permission-check {
+  align-items: center;
+  background: var(--surface);
+  border: 1.5px solid color-mix(in srgb, var(--ink) 34%, transparent);
+  border-radius: 6px;
+  color: var(--accent-contrast);
+  display: flex;
+  flex: 0 0 auto;
+  height: 20px;
+  justify-content: center;
+  transition: background .16s ease, border-color .16s ease;
+  width: 20px;
+}
+
+.is-selected > .permission-check,
+.is-part > .permission-check {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.permission-check svg {
+  height: 12px;
+  stroke-width: 3.2;
+  width: 12px;
+}
+
+/* Below this the description column is too narrow to read, so it wraps under. */
+@media (max-width: 640px) {
+  .permission-leaf {
+    align-items: start;
+    grid-template-columns: auto minmax(0, 1fr);
+    row-gap: 2px;
+  }
+
+  .permission-leaf small {
+    grid-column: 2;
+  }
+}
+
+.permission-tag {
+  border-radius: 999px;
+  font-size: var(--type-compact);
+  font-style: normal;
+  font-weight: 750;
+  letter-spacing: .02em;
+  line-height: 1.4;
+  padding: 1px 8px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.permission-tag.is-risk {
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+  color: var(--amber-ink);
+}
+
+.permission-tag.is-locked {
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  color: var(--muted);
+}
+
+.role-permission-empty {
+  border: 1px dashed var(--line);
+  border-radius: 14px;
+  color: var(--muted);
+  font-size: var(--type-supporting);
+  margin: 0;
+  padding: 28px 16px;
+  text-align: center;
+}
+
+/* An amber wash ties the dialog to the access-control area of the product. */
+.form-dialog.is-accent-role-access .form-dialog-panel {
+  border-top: 3px solid var(--accent);
+}
+
+.form-dialog.is-accent-role-access .form-dialog-header {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 12%, var(--surface)), var(--surface));
 }
 
 @media (max-width: 620px) {
@@ -8792,6 +9327,211 @@ button.row-action-link {
   }
 }
 
+
+/* ---- People and access register (User Roles Management) ---------------- */
+
+.role-members-card {
+  display: grid;
+  gap: 14px;
+}
+
+.role-members-card > header {
+  align-items: center;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: auto minmax(0, 1fr) minmax(0, 18rem);
+}
+
+.role-members-card > header > span {
+  align-items: center;
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+  border-radius: 12px;
+  color: var(--accent-strong);
+  display: flex;
+  height: 38px;
+  justify-content: center;
+  width: 38px;
+}
+
+.role-members-card > header h2 {
+  font-size: var(--type-card-title);
+  letter-spacing: -.02em;
+  margin: .1rem 0 .2rem;
+}
+
+.role-members-card > header p:last-child {
+  color: var(--muted);
+  font-size: var(--type-supporting);
+  margin: 0;
+}
+
+.role-members-search {
+  align-items: center;
+  display: flex;
+  position: relative;
+}
+
+.role-members-search svg {
+  color: var(--muted);
+  height: 15px;
+  left: 12px;
+  pointer-events: none;
+  position: absolute;
+  width: 15px;
+}
+
+.role-members-search input {
+  background: var(--input-surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--type-supporting);
+  min-height: 38px;
+  outline: 0;
+  padding: 0 12px 0 34px;
+  width: 100%;
+}
+
+.role-members-search input:focus {
+  border-color: var(--focus-ring);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus-ring) 26%, transparent);
+}
+
+.role-members-list {
+  display: grid;
+  gap: 8px;
+}
+
+.role-members-list > article {
+  align-items: center;
+  background: color-mix(in srgb, var(--input-surface) 60%, transparent);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  column-gap: 14px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) auto minmax(0, auto);
+  padding: 10px 14px;
+  row-gap: 8px;
+}
+
+.role-member-identity,
+.role-member-role {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.role-members-list strong {
+  font-size: var(--type-supporting);
+  font-weight: 750;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.role-members-list small {
+  color: var(--muted);
+  font-size: var(--type-compact);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.role-member-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.role-member-actions button {
+  align-items: center;
+  display: inline-flex;
+  gap: 5px;
+}
+
+.role-member-actions svg {
+  height: 13px;
+  width: 13px;
+}
+
+.role-member-protected {
+  align-items: center;
+  color: var(--muted);
+  display: inline-flex;
+  font-size: var(--type-compact);
+  font-weight: 700;
+  gap: 5px;
+  justify-content: flex-end;
+}
+
+.role-member-protected svg {
+  height: 14px;
+  width: 14px;
+}
+
+/* A result belongs to the row it came from, so it spans the row rather than
+   squeezing into the action column. */
+.role-member-error,
+.role-member-note,
+.role-member-password {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.role-member-error {
+  color: var(--red);
+  font-size: var(--type-compact);
+  font-weight: 650;
+}
+
+.role-member-note {
+  color: var(--mint-ink, var(--mint));
+  font-size: var(--type-compact);
+  font-weight: 650;
+}
+
+.role-members-empty {
+  color: var(--muted);
+  font-size: var(--type-supporting);
+  margin: 0;
+  padding: 22px 4px;
+  text-align: center;
+}
+
+@media (max-width: 900px) {
+  .role-members-card > header,
+  .role-members-list > article {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .role-members-card > header > span {
+    display: none;
+  }
+
+  .role-member-actions,
+  .role-member-protected {
+    justify-content: flex-start;
+  }
+}
+
+/* A scoped dashboard that looks empty needs to say why, or it reads as a fault. */
+.scope-notice {
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--accent) 34%, var(--line));
+  border-radius: 14px;
+  color: var(--ink);
+  font-size: var(--type-supporting);
+  line-height: 1.5;
+  margin: 0;
+  padding: 12px 16px;
+}
+
+.scope-notice a {
+  color: var(--accent-strong);
+  font-weight: 750;
+}
 
 .shift-name-line {
   align-items: center;
@@ -11112,7 +11852,7 @@ button.row-action-link {
   :root[data-sidebar="rail"] .practice-health-card p,
   :root[data-sidebar="rail"] .practice-health-progress,
   :root[data-sidebar="rail"] .account-summary > span:nth-child(2),
-  :root[data-sidebar="rail"] .account-summary > form,
+  :root[data-sidebar="rail"] .account-summary > .account-controls,
   :root[data-sidebar="rail"] .account-summary > .icon-button {
     display: none;
   }
