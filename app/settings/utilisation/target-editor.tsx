@@ -59,6 +59,14 @@ export function TargetEditor({
           </div>
         </div>
 
+        {/* Naming the gap is only half of it; the reader needs to see which roles. */}
+        {rolesWithout.length > 0 && (
+          <p className="target-gaps">
+            <span>Not measured:</span>
+            {rolesWithout.map((key) => <b key={key}>{roleLabel(key)}</b>)}
+          </p>
+        )}
+
         {roleTargets.length === 0 ? (
           <p className="rate-empty">No role targets. Until one is set, utilisation is reported but not judged.</p>
         ) : (
@@ -75,7 +83,8 @@ export function TargetEditor({
                 {canManage ? (
                   <form action={remove}>
                     <input name="targetId" type="hidden" value={row.id} />
-                    <button className="rate-withdraw" disabled={removing} type="submit">Withdraw</button>
+                    {/* Every row offers the same word, so the label has to say which target. */}
+                    <button aria-label={`Withdraw the ${roleLabel(row.roleKey ?? "")} target`} className="rate-withdraw" disabled={removing} type="submit">Withdraw</button>
                   </form>
                 ) : <span />}
               </article>
@@ -109,7 +118,7 @@ export function TargetEditor({
                 {canManage ? (
                   <form action={remove}>
                     <input name="targetId" type="hidden" value={row.id} />
-                    <button className="rate-withdraw" disabled={removing} type="submit">Withdraw</button>
+                    <button aria-label={`Withdraw the override for ${row.employeeName ?? "a former employee"}`} className="rate-withdraw" disabled={removing} type="submit">Withdraw</button>
                   </form>
                 ) : <span />}
               </article>
@@ -117,7 +126,24 @@ export function TargetEditor({
           </>
         )}
 
-        {canManage && (
+      </section>
+
+      {/*
+       * Its own panel because it sets either kind of target. Living inside the
+       * overrides panel meant the only way to add a role target was a form
+       * headed "per-person overrides", while the role panel announced the gap
+       * and offered nothing to close it.
+       */}
+      {canManage && (
+        <section className="surface-card rate-card-panel">
+          <div className="panel-heading">
+            <div>
+              <p className="eyebrow">SET A TARGET</p>
+              <h2>Add or replace a target</h2>
+              <span>A new target takes effect from the date you give it. Earlier months keep the target that applied at the time.</span>
+            </div>
+          </div>
+
           <form action={save} className="rate-form">
             <label>
               <span>Applies to</span>
@@ -154,18 +180,17 @@ export function TargetEditor({
             <label>
               <span>In force from</span>
               <input defaultValue={todayKey} name="effectiveFrom" required type="date" />
-              <small>Earlier months keep the target that applied at the time.</small>
             </label>
             <label className="rate-form-wide">
               <span>Note (optional)</span>
               <input maxLength={300} name="note" placeholder="Why this target, and who agreed it" type="text" />
             </label>
-            <button className="secondary-button" disabled={saving} type="submit">
+            <button className="primary-button rate-form-submit" disabled={saving} type="submit">
               {saving ? "Saving…" : "Set target"}
             </button>
           </form>
-        )}
-      </section>
+        </section>
+      )}
     </>
   );
 }

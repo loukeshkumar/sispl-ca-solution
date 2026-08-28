@@ -14412,20 +14412,62 @@ button.kpi-card[aria-pressed="true"] {
   margin: 8px 0 0;
 }
 
+/*
+ * `align-items: end` lined the fields up by their bottoms, so a field carrying
+ * a hint sat lower than one without and the row of labels came out ragged.
+ * Aligning to the start puts every label on one line and lets the hints hang.
+ */
+/*
+ * Flex rather than `repeat(auto-fit, minmax(190px, 1fr))`: auto-fit lays down
+ * as many tracks as the width allows, so a form with fewer fields than tracks
+ * left a band of dead space on the right. These forms carry anywhere from two
+ * to fourteen fields, so the fields grow to fill whatever row they land on.
+ */
 .rate-form {
-  align-items: end;
+  align-items: flex-start;
   border-top: 1px solid var(--line);
-  display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 14px;
   margin-top: 16px;
   padding-top: 18px;
 }
 
 .rate-form label {
   display: grid;
-  gap: 5px;
+  flex: 1 1 190px;
+  gap: 6px;
   min-width: 0;
+}
+
+/* These were browser defaults sitting inside an otherwise styled page. The box
+   matches the dialog's fields; the native select arrow stays, as it does there. */
+.rate-form input,
+.rate-form select {
+  background: var(--input-surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--ink);
+  min-height: 42px;
+  outline: 0;
+  padding: 0 12px;
+  width: 100%;
+}
+
+.rate-form select {
+  cursor: pointer;
+}
+
+.rate-form input:focus,
+.rate-form select:focus {
+  border-color: var(--focus-ring);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus-ring) 26%, transparent);
+}
+
+/* The full-width note before it forces a wrap, so the commit action gets its
+   own row and only needs pushing to the end of it. */
+.rate-form-submit {
+  margin-left: auto;
 }
 
 .rate-form label > span {
@@ -14435,19 +14477,62 @@ button.kpi-card[aria-pressed="true"] {
 
 .rate-form small { color: var(--muted); font-size: var(--type-compact); }
 .rate-form .rate-field-error { color: var(--red); }
-.rate-form .rate-form-wide { grid-column: 1 / -1; }
+.rate-form .rate-form-wide { flex-basis: 100%; }
 
+/* A destructive action needs a real target to hit, not a 26px sliver. */
 .rate-withdraw {
   background: transparent;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 9px;
   color: var(--muted);
   cursor: pointer;
   font-size: var(--type-compact);
-  padding: 5px 10px;
+  font-weight: 700;
+  min-height: 34px;
+  padding: 0 12px;
+  transition: background .16s ease, border-color .16s ease, color .16s ease;
+  white-space: nowrap;
 }
 
-.rate-withdraw:hover { border-color: var(--red); color: var(--red); }
+.rate-withdraw:hover {
+  background: color-mix(in srgb, var(--red) 8%, transparent);
+  border-color: var(--red);
+  color: var(--red);
+}
+
+.rate-withdraw:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.rate-withdraw:disabled {
+  cursor: not-allowed;
+  opacity: .55;
+}
+
+/* Which roles are unmeasured, not just how many. */
+.target-gaps {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 0;
+}
+
+.target-gaps > span {
+  color: var(--muted);
+  font-size: var(--type-compact);
+  font-weight: 650;
+}
+
+.target-gaps b {
+  background: color-mix(in srgb, var(--amber) 12%, transparent);
+  border-radius: 999px;
+  color: var(--amber-ink);
+  font-size: var(--type-compact);
+  font-weight: 700;
+  padding: 3px 10px;
+}
 
 @media (max-width: 1000px) {
   .rate-card-head,
