@@ -9417,9 +9417,19 @@ button.row-action-link {
   border-radius: 14px;
   column-gap: 14px;
   display: grid;
-  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) auto minmax(0, auto);
+  /*
+   * Every row is its own grid, so an `auto` track sizes to that row's own
+   * content and the columns drift out of line down the list — the Protected
+   * row, which has no buttons, pulled its badge a hundred pixels right. Fixed
+   * tracks for the status and action columns resolve identically in every row.
+   */
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 150px 250px;
   padding: 10px 14px;
   row-gap: 8px;
+}
+
+.role-members-list > article > .status-badge {
+  justify-self: start;
 }
 
 .role-member-identity,
