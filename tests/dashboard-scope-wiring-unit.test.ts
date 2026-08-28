@@ -24,3 +24,16 @@ test("every dashboard entry point resolves a scope before loading data", async (
     assert.doesNotMatch(source, /FIRM_SCOPE/, `${path} no longer references FIRM_SCOPE`);
   }
 });
+
+test("a team scope with no reports explains itself instead of looking broken", async () => {
+  const [overview, css] = await Promise.all([
+    read("../app/dashboard/overview-workspace.tsx"),
+    read("../app/globals.css"),
+  ]);
+
+  assert.match(overview, /data\.scope\?\.kind === "team" && !data\.scope\.hasReports/);
+  assert.match(overview, /reporting lines/i);
+  // The explanation has to lead somewhere the reader can act.
+  assert.match(overview, /href="\/\?workspace=team"/);
+  assert.match(css, /\.scope-notice \{/);
+});

@@ -9516,6 +9516,23 @@ button.row-action-link {
   }
 }
 
+/* A scoped dashboard that looks empty needs to say why, or it reads as a fault. */
+.scope-notice {
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--accent) 34%, var(--line));
+  border-radius: 14px;
+  color: var(--ink);
+  font-size: var(--type-supporting);
+  line-height: 1.5;
+  margin: 0;
+  padding: 12px 16px;
+}
+
+.scope-notice a {
+  color: var(--accent-strong);
+  font-weight: 750;
+}
+
 .shift-name-line {
   align-items: center;
   display: flex;
