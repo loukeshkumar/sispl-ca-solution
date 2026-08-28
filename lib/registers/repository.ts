@@ -402,6 +402,56 @@ export async function recordDscCustodyMovement(
   });
 }
 
+export type EmployeeCompliance = {
+  dscHeld: Array<{ certificateName: string; clientName: string; id: string; validUntil: string }>;
+  udinCount: number;
+  udinLatest: string | null;
+  udinRevoked: number;
+};
+
+/**
+ * The statutory footprint of one person: signing devices they hold right now,
+ * and the UDINs issued in their name.
+ *
+ * Both already existed in the registers and neither was reachable from the
+ * employee record, which is where the question is asked — most sharply when
+ * somebody is leaving and the firm needs to know what they are still holding.
+ */
+export async function getEmployeeCompliance(
+  database: DashboardDatabase,
+  tenantId: string,
+  employeeUserId: string,
+): Promise<EmployeeCompliance> {
+  const [held, udins] = await Promise.all([
+    database.select({
+      certificateName: dscCertificates.holderName,
+      clientName: legalEntities.displayName,
+      id: dscCertificates.id,
+      validUntil: dscCertificates.validUntil,
+    }).from(dscCertificates)
+      .leftJoin(legalEntities, and(eq(legalEntities.tenantId, tenantId), eq(legalEntities.id, dscCertificates.legalEntityId)))
+      .where(and(
+        eq(dscCertificates.tenantId, tenantId),
+        eq(dscCertificates.custodianUserId, employeeUserId),
+        eq(dscCertificates.status, "in_custody"),
+      ))
+      .orderBy(asc(dscCertificates.validUntil)),
+    database.select({
+      generatedOn: udinRegistrations.generatedOn,
+      status: udinRegistrations.status,
+    }).from(udinRegistrations)
+      .where(and(eq(udinRegistrations.tenantId, tenantId), eq(udinRegistrations.signedByUserId, employeeUserId)))
+      .orderBy(desc(udinRegistrations.generatedOn)),
+  ]);
+
+  return {
+    dscHeld: held.map((row) => ({ ...row, clientName: row.clientName ?? "Unassigned client" })),
+    udinCount: udins.length,
+    udinLatest: udins[0]?.generatedOn ?? null,
+    udinRevoked: udins.filter((row) => row.status === "revoked").length,
+  };
+}
+
 export async function listDscCustodyTrail(database: DashboardDatabase, tenantId: string, dscId: string) {
   const custodian = alias(users, "custody_user");
   const rows = await database.select({

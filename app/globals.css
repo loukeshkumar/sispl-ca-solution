@@ -9330,6 +9330,100 @@ button.row-action-link {
 }
 
 
+/* ---- Employee statutory record ----------------------------------------- */
+
+.employee-compliance {
+  display: grid;
+  gap: 14px;
+}
+
+.compliance-figures {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(165px, 1fr));
+  margin: 0;
+}
+
+.compliance-figures > div {
+  background: color-mix(in srgb, var(--input-surface) 60%, transparent);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  display: grid;
+  gap: 2px;
+  padding: 12px 14px;
+}
+
+.compliance-figures dt {
+  color: var(--muted);
+  font-size: var(--type-label);
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.compliance-figures dd {
+  font-size: var(--type-kpi);
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  line-height: 1.1;
+  margin: 0;
+}
+
+/* Holding a device or owing CPE is not an error, but it is worth seeing. */
+.compliance-figures dd.is-attention {
+  color: var(--amber-ink);
+}
+
+.compliance-figures span {
+  color: var(--muted);
+  font-size: var(--type-compact);
+}
+
+.compliance-custody {
+  display: grid;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.compliance-custody li {
+  align-items: center;
+  background: color-mix(in srgb, var(--input-surface) 60%, transparent);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: space-between;
+  padding: 10px 14px;
+}
+
+.compliance-custody li.is-expired {
+  border-color: color-mix(in srgb, var(--red) 34%, var(--line));
+}
+
+.compliance-custody span {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.compliance-custody strong {
+  font-size: var(--type-supporting);
+  font-weight: 750;
+}
+
+.compliance-custody small {
+  color: var(--muted);
+  font-size: var(--type-compact);
+}
+
+.compliance-custody li.is-expired > small {
+  color: var(--red);
+  font-weight: 700;
+}
+
 /* ---- Employee utilisation ---------------------------------------------- */
 
 .employee-utilisation {

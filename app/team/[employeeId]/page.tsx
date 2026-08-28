@@ -29,6 +29,9 @@ import { listLeaveBalances } from "../../../lib/attendance/leave-ledger-reposito
 import { ActivityTimeline } from "./activity-timeline";
 import { listFirmUtilisation } from "../../../lib/rates/utilisation-repository";
 import { LeaveEntitlement } from "./leave-entitlement";
+import { getEmployeeCompliance } from "../../../lib/registers/repository";
+import { listTrainingWorkspace } from "../../../lib/training/repository";
+import { CompliancePanel } from "./compliance-panel";
 import { UtilisationPanel } from "./utilisation-panel";
 
 export const dynamic = "force-dynamic";
@@ -46,7 +49,7 @@ export default async function Employee360Page({ params, searchParams }: { params
   const canReviewAttendance = hasPermission(session, "attendance:review");
   const canManageSalary = hasPermission(session, "salary:manage");
   const canReviewTime = hasPermission(session, "timesheets:manage");
-  const [attendanceWorkspace, salaryData, bankAccount, capabilities, capabilityServices, trainingEvidence, clearance, activity, leaveBalances, firmUtilisation] = await Promise.all([
+  const [attendanceWorkspace, salaryData, bankAccount, capabilities, capabilityServices, trainingEvidence, clearance, activity, leaveBalances, firmUtilisation, compliance, training] = await Promise.all([
     canReviewAttendance ? getAttendanceWorkspace(database, session.tenantId, session.userId, session.roleKey as Role).catch(() => null) : Promise.resolve(null),
     canManageSalary ? getSalaryStructureEditorData(database, session.tenantId, session.userId, employee.userId) : Promise.resolve(null),
     canManageSalary ? loadOptionalPanel("bank-account", () => getActiveBankAccount(database, session.tenantId, employee.userId), null) : Promise.resolve(null),
@@ -68,10 +71,14 @@ export default async function Employee360Page({ params, searchParams }: { params
     canReviewTime
       ? listFirmUtilisation(database, session.tenantId, indiaDateKey().slice(0, 7)).catch(() => null)
       : Promise.resolve(null),
+    getEmployeeCompliance(database, session.tenantId, employee.userId)
+      .catch(() => ({ dscHeld: [], udinCount: 0, udinLatest: null, udinRevoked: 0 })),
+    listTrainingWorkspace(database, session.tenantId, indiaDateKey()).catch(() => null),
   ]);
   const attendanceSummary = attendanceWorkspace?.team.find((member) => member.userId === employee.userId) ?? null;
   const monthlyGrossPaise = salaryData?.current?.lines.filter((line) => line.kind === "earning").reduce((sum, line) => sum + line.monthlyAmountPaise, 0) ?? null;
   const personUtilisation = firmUtilisation?.people.find((row) => row.employeeUserId === employee.userId) ?? null;
+  const personStanding = training?.members.find((row) => row.employeeUserId === employee.userId) ?? null;
   const disableError = (await searchParams).disableError;
   const todayKey = indiaDateKey();
   // Months rather than a date difference: "1y 4m" answers the question a date
@@ -215,6 +222,11 @@ export default async function Employee360Page({ params, searchParams }: { params
                 ),
                 id: "people",
                 label: "People ops",
+              },
+              {
+                content: <CompliancePanel compliance={compliance} standing={personStanding} todayKey={todayKey} />,
+                id: "statutory",
+                label: "Statutory",
               },
               {
                 badge: activity.length,
