@@ -104,3 +104,28 @@ test("authenticated PostgreSQL provider loads only the explicit session tenant",
   assert.equal(dashboard.source, "postgres");
   assert.equal(dashboard.scope?.kind, "own");
 });
+
+test("hasReports is false for a team scope holding only the viewer, and true once a report joins", async () => {
+  const dependencies = {
+    getDatabase: () => ({}) as never,
+    loadDashboardRecords: async () => demoDashboardRecords,
+  };
+
+  const soloManager = await getPostgresDashboardDataForTenant(
+    SEEDED_TENANT_ID,
+    { kind: "team", userIds: ["manager-1"] },
+    new Date("2026-08-15T09:00:00+05:30"),
+    dependencies,
+  );
+  assert.equal(soloManager.scope?.kind, "team");
+  assert.equal(soloManager.scope?.hasReports, false);
+
+  const managerWithReport = await getPostgresDashboardDataForTenant(
+    SEEDED_TENANT_ID,
+    { kind: "team", userIds: ["manager-1", "report-1"] },
+    new Date("2026-08-15T09:00:00+05:30"),
+    dependencies,
+  );
+  assert.equal(managerWithReport.scope?.kind, "team");
+  assert.equal(managerWithReport.scope?.hasReports, true);
+});
