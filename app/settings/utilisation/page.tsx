@@ -7,6 +7,8 @@ import { requirePermission } from "../../../lib/auth/server";
 import { indiaDateKey } from "../../../lib/attendance/calculations";
 import { getDatabase } from "../../../lib/dashboard/postgres/pool";
 import { listFirmUtilisation, listUtilisationTargetRows } from "../../../lib/rates/utilisation-repository";
+import { KpiCard } from "../../dashboard/dashboard-ui";
+import { Attainment } from "./attainment";
 import { TargetEditor } from "./target-editor";
 
 export const dynamic = "force-dynamic";
@@ -35,6 +37,8 @@ export default async function UtilisationSettingsPage() {
   ]);
 
   const measured = utilisation ? utilisation.people.length - utilisation.unmeasured : 0;
+  // "Meeting target" counts anybody not short of it: above target is not a miss.
+  const onTarget = utilisation?.people.filter((person) => person.band === "on_target" || person.band === "over").length ?? 0;
 
   return (
     <main className="client-page-shell settings-stack-shell">
@@ -50,27 +54,40 @@ export default async function UtilisationSettingsPage() {
         </div>
       </header>
 
-      <section className="package-kpi-grid kpi-grid">
-        <article className="surface-card checklist-kpi">
-          <span>PEOPLE MEASURED</span><strong>{String(measured).padStart(2, "0")}</strong>
-          <small>of {utilisation?.people.length ?? 0} active employees</small>
-        </article>
-        <article className="surface-card checklist-kpi">
-          <span>FIRM UTILISATION</span>
-          <strong>{utilisation?.utilisationBps === null || utilisation === null ? "—" : `${(utilisation.utilisationBps / 100).toFixed(1)}%`}</strong>
-          <small>Chargeable of available, {todayKey.slice(0, 7)}</small>
-        </article>
-        <article className="surface-card checklist-kpi">
-          <span>ROLE TARGETS</span><strong>{String(targets.filter((row) => row.scope === "role").length).padStart(2, "0")}</strong>
-          <small>Inherited by everyone in the role</small>
-        </article>
-        <article className="surface-card checklist-kpi">
-          <span>OVERRIDES</span><strong>{String(targets.filter((row) => row.scope === "employee").length).padStart(2, "0")}</strong>
-          <small>People measured to their own figure</small>
-        </article>
+      <section className="kpi-grid">
+        <KpiCard
+          icon="insights"
+          label="FIRM UTILISATION"
+          note={`Chargeable of available, ${todayKey.slice(0, 7)}`}
+          tone="blue"
+          value={utilisation?.utilisationBps == null ? "—" : `${(utilisation.utilisationBps / 100).toFixed(1)}%`}
+        />
+        <KpiCard
+          icon="review"
+          label="MEETING TARGET"
+          note={`of ${measured} measured this month`}
+          tone={onTarget === measured ? "mint" : "amber"}
+          value={String(onTarget).padStart(2, "0")}
+        />
+        <KpiCard
+          icon="settings"
+          label="ROLE TARGETS"
+          note="Inherited by everyone in the role"
+          tone="blue"
+          value={String(targets.filter((row) => row.scope === "role").length).padStart(2, "0")}
+        />
+        <KpiCard
+          icon="team"
+          label="OVERRIDES"
+          note="People measured to their own figure"
+          tone="mint"
+          value={String(targets.filter((row) => row.scope === "employee").length).padStart(2, "0")}
+        />
       </section>
 
       <TargetEditor canManage={canManage} employees={employees} targets={targets} todayKey={todayKey} />
+
+      <Attainment periodKey={todayKey.slice(0, 7)} utilisation={utilisation} />
     </main>
   );
 }
