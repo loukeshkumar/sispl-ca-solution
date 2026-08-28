@@ -185,7 +185,7 @@ export function TargetEditor({
               <span>Note (optional)</span>
               <input maxLength={300} name="note" placeholder="Why this target, and who agreed it" type="text" />
             </label>
-            <button className="primary-button rate-form-submit" disabled={saving} type="submit">
+            <button className="primary-button" disabled={saving} type="submit">
               {saving ? "Saving…" : "Set target"}
             </button>
           </form>

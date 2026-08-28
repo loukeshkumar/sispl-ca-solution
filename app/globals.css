@@ -14423,17 +14423,26 @@ button.kpi-card[aria-pressed="true"] {
  * left a band of dead space on the right. These forms carry anywhere from two
  * to fourteen fields, so the fields grow to fill whatever row they land on.
  */
-.rate-form {
+.rate-form,
+.procedure-form,
+.training-form {
   align-items: flex-start;
-  border-top: 1px solid var(--line);
   display: flex;
   flex-wrap: wrap;
   gap: 16px 14px;
+}
+
+/* Two of the three sit under a register and need a rule above them. */
+.rate-form,
+.training-form {
+  border-top: 1px solid var(--line);
   margin-top: 16px;
   padding-top: 18px;
 }
 
-.rate-form label {
+.rate-form label,
+.procedure-form label,
+.training-form label {
   display: grid;
   flex: 1 1 190px;
   gap: 6px;
@@ -14443,7 +14452,12 @@ button.kpi-card[aria-pressed="true"] {
 /* These were browser defaults sitting inside an otherwise styled page. The box
    matches the dialog's fields; the native select arrow stays, as it does there. */
 .rate-form input,
-.rate-form select {
+.rate-form select,
+.procedure-form input,
+.procedure-form select,
+.procedure-form textarea,
+.training-form input,
+.training-form select {
   background: var(--input-surface);
   border: 1px solid var(--line);
   border-radius: 10px;
@@ -14454,19 +14468,33 @@ button.kpi-card[aria-pressed="true"] {
   width: 100%;
 }
 
-.rate-form select {
+.rate-form select,
+.procedure-form select,
+.training-form select {
   cursor: pointer;
 }
 
+.procedure-form textarea {
+  min-height: 84px;
+  padding: 10px 12px;
+}
+
 .rate-form input:focus,
-.rate-form select:focus {
+.rate-form select:focus,
+.procedure-form input:focus,
+.procedure-form select:focus,
+.procedure-form textarea:focus,
+.training-form input:focus,
+.training-form select:focus {
   border-color: var(--focus-ring);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus-ring) 26%, transparent);
 }
 
-/* The full-width note before it forces a wrap, so the commit action gets its
-   own row and only needs pushing to the end of it. */
-.rate-form-submit {
+/* Where a full-width field precedes it the button gets its own row; either
+   way it belongs at the end rather than wedged between two fields. */
+.rate-form > button[type="submit"],
+.procedure-form > button[type="submit"],
+.training-form > button[type="submit"] {
   margin-left: auto;
 }
 
@@ -14641,19 +14669,10 @@ button.kpi-card[aria-pressed="true"] {
 .procedure-steps small { color: var(--muted); font-size: var(--type-compact); }
 .procedure-steps em { color: var(--muted); font-style: normal; }
 
-.procedure-form {
-  align-items: end;
-  display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-}
-
-.procedure-form label { display: grid; gap: 5px; min-width: 0; }
 .procedure-form label > span { font-size: var(--type-compact); font-weight: 500; }
 .procedure-form small { color: var(--muted); font-size: var(--type-compact); }
-.procedure-form-wide { grid-column: 1 / -1; }
+.procedure-form .procedure-form-wide { flex-basis: 100%; }
 
-.procedure-form textarea,
 .step-skip-form input {
   border: 1px solid var(--line);
   border-radius: 10px;
@@ -14995,21 +15014,10 @@ form > .review-panel { margin-top: 16px; }
 .training-type.is-unstructured { color: var(--blue); }
 .training-type.is-course { color: var(--muted); }
 
-.training-form {
-  align-items: end;
-  border-top: 1px solid var(--line);
-  display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  margin-top: 16px;
-  padding-top: 18px;
-}
-
-.training-form label { display: grid; gap: 5px; min-width: 0; }
 .training-form label > span { font-size: var(--type-compact); font-weight: 500; }
 .training-form small { color: var(--muted); font-size: var(--type-compact); }
 .training-form .rate-field-error { color: var(--red); }
-.training-form-wide { grid-column: 1 / -1; }
+.training-form .training-form-wide { flex-basis: 100%; }
 
 @media (max-width: 1100px) {
   .training-standing-head,

@@ -101,7 +101,7 @@ export function RateCardEditor({ canManage, card }: { canManage: boolean; card: 
               <span>Note (optional)</span>
               <input maxLength={300} name="note" placeholder="Why the rate changed" type="text" />
             </label>
-            <button className="secondary-button" disabled={savingRate || !employeeUserId} type="submit">
+            <button className="primary-button" disabled={savingRate || !employeeUserId} type="submit">
               {savingRate ? "Saving…" : "Set rate"}
             </button>
           </form>
@@ -170,7 +170,7 @@ export function RateCardEditor({ canManage, card }: { canManage: boolean; card: 
               <span>Note (optional)</span>
               <input maxLength={300} name="note" placeholder="What was agreed, and with whom" type="text" />
             </label>
-            <button className="secondary-button" disabled={savingOverride || !legalEntityId || !overrideEmployee} type="submit">
+            <button className="primary-button" disabled={savingOverride || !legalEntityId || !overrideEmployee} type="submit">
               {savingOverride ? "Saving…" : "Record negotiated rate"}
             </button>
           </form>

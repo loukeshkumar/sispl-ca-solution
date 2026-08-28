@@ -213,7 +213,7 @@ export function TrainingView({
               <span>Certificate reference</span>
               <input maxLength={80} name="certificateReference" placeholder="Optional" type="text" />
             </label>
-            <button className="secondary-button" disabled={recording} type="submit">
+            <button className="primary-button" disabled={recording} type="submit">
               {recording ? "Recording…" : "Record training"}
             </button>
           </form>
@@ -273,7 +273,7 @@ export function TrainingView({
               <input defaultChecked={policy.confirmed} name="confirmed" type="checkbox" />
               <span>I have checked these against the current ICAI announcement</span>
             </label>
-            <button className="secondary-button" disabled={savingPolicy} type="submit">
+            <button className="primary-button" disabled={savingPolicy} type="submit">
               {savingPolicy ? "Saving…" : "Save requirement"}
             </button>
           </form>
