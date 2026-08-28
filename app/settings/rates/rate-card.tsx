@@ -13,6 +13,19 @@ const formatDate = (value: string) => new Intl.DateTimeFormat("en-IN", { dateSty
 
 const perHour = (paise: number | null) => (paise === null ? "—" : `${formatPaise(paise)}/hr`);
 
+/**
+ * What an hour of this person earns the firm.
+ *
+ * Both halves are already on the row; not showing the difference left the
+ * reader to do the subtraction on every line. Margin is only stated where both
+ * sides are known — a missing cost is unknown margin, not zero margin.
+ */
+function marginOf(row: RateCard["rows"][number]) {
+  if (row.chargePaisePerHour === null || row.costPaisePerHour === null) return null;
+  const paise = row.chargePaisePerHour - row.costPaisePerHour;
+  return { paise, share: row.chargePaisePerHour > 0 ? (paise / row.chargePaisePerHour) * 100 : 0 };
+}
+
 const COST_BASIS_NOTE: Record<RateCard["rows"][number]["costBasis"], string> = {
   payroll: "From the salary structure",
   rate_card: "Entered by hand",
@@ -56,7 +69,7 @@ export function RateCardEditor({ canManage, card }: { canManage: boolean; card: 
         </div>
 
         <div className="package-register-head rate-card-head">
-          <span>Employee</span><span>Charge</span><span>Cost</span><span>In force from</span><span>Client rates</span>
+          <span>Employee</span><span>Charge</span><span>Cost</span><span>Margin an hour</span><span>In force from</span><span>Client rates</span>
         </div>
         {card.rows.map((row) => (
           <article className={`package-register-row rate-card-row${row.chargePaisePerHour === null ? " is-unrated" : ""}`} key={row.employeeUserId}>
@@ -66,6 +79,7 @@ export function RateCardEditor({ canManage, card }: { canManage: boolean; card: 
               {row.chargePaisePerHour === null && <small>Billable time is not valued</small>}
             </span>
             <span><strong>{perHour(row.costPaisePerHour)}</strong><small>{COST_BASIS_NOTE[row.costBasis]}</small></span>
+            <RateMargin row={row} />
             <span>{row.effectiveFrom ? formatDate(row.effectiveFrom) : "—"}</span>
             <span>{row.overrideCount ? `${row.overrideCount} negotiated` : "House rate only"}</span>
           </article>
@@ -177,5 +191,22 @@ export function RateCardEditor({ canManage, card }: { canManage: boolean; card: 
         )}
       </section>
     </>
+  );
+}
+
+/**
+ * A loss-making rate is the one thing here worth colouring: everything else is
+ * a number the reader judges for themselves against their own firm.
+ */
+function RateMargin({ row }: { row: RateCard["rows"][number] }) {
+  const margin = marginOf(row);
+  if (!margin) {
+    return <span className="rate-margin is-unknown"><strong>—</strong><small>Cost unknown</small></span>;
+  }
+  return (
+    <span className={`rate-margin${margin.paise < 0 ? " is-negative" : ""}`}>
+      <strong>{formatPaise(margin.paise)}</strong>
+      <small>{margin.paise < 0 ? "Charged below cost" : `${margin.share.toFixed(0)}% of the charge`}</small>
+    </span>
   );
 }

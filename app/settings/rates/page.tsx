@@ -6,6 +6,7 @@ import { indiaDateKey } from "../../../lib/attendance/calculations";
 import { getDatabase } from "../../../lib/dashboard/postgres/pool";
 import { formatPaise } from "../../../lib/payroll/money";
 import { listRateCard } from "../../../lib/rates/repository";
+import { KpiCard } from "../../dashboard/dashboard-ui";
 import { RateCardEditor } from "./rate-card";
 
 export const dynamic = "force-dynamic";
@@ -20,7 +21,14 @@ export default async function RateCardPage() {
   const averageCharge = rated.length
     ? Math.round(rated.reduce((total, row) => total + (row.chargePaisePerHour ?? 0), 0) / rated.length)
     : 0;
-  const derivedCost = card.rows.filter((row) => row.costBasis === "payroll").length;
+  // Margin only means anything where both halves are known, so it is averaged
+  // over those people rather than over everybody.
+  const margins = card.rows
+    .filter((row) => row.chargePaisePerHour !== null && row.costPaisePerHour !== null)
+    .map((row) => row.chargePaisePerHour! - row.costPaisePerHour!);
+  const averageMargin = margins.length
+    ? Math.round(margins.reduce((total, value) => total + value, 0) / margins.length)
+    : null;
 
   return (
     <main className="client-page-shell settings-stack-shell">
@@ -36,23 +44,35 @@ export default async function RateCardPage() {
         </div>
       </header>
 
-      <section className="package-kpi-grid kpi-grid">
-        <article className="surface-card checklist-kpi">
-          <span>RATED PEOPLE</span><strong>{String(rated.length).padStart(2, "0")}</strong>
-          <small>of {card.rows.length} active employees</small>
-        </article>
-        <article className="surface-card checklist-kpi">
-          <span>AVERAGE CHARGE</span><strong>{averageCharge ? formatPaise(averageCharge) : "—"}</strong>
-          <small>Per hour, across rated people</small>
-        </article>
-        <article className="surface-card checklist-kpi">
-          <span>COST FROM PAYROLL</span><strong>{String(derivedCost).padStart(2, "0")}</strong>
-          <small>Derived rather than typed</small>
-        </article>
-        <article className="surface-card checklist-kpi">
-          <span>NEGOTIATED RATES</span><strong>{String(card.overrides.length).padStart(2, "0")}</strong>
-          <small>Client exceptions on file</small>
-        </article>
+      <section className="kpi-grid">
+        <KpiCard
+          icon="billing"
+          label="AVERAGE CHARGE"
+          note="Per hour, across rated people"
+          tone="blue"
+          value={averageCharge ? formatPaise(averageCharge) : "—"}
+        />
+        <KpiCard
+          icon="insights"
+          label="AVERAGE MARGIN"
+          note={margins.length ? `Per hour, where cost is known (${margins.length})` : "No cost on file yet"}
+          tone={averageMargin !== null && averageMargin < 0 ? "red" : "mint"}
+          value={averageMargin === null ? "—" : formatPaise(averageMargin)}
+        />
+        <KpiCard
+          icon="team"
+          label="RATED PEOPLE"
+          note={`of ${card.rows.length} active employees`}
+          tone={rated.length === card.rows.length ? "mint" : "amber"}
+          value={String(rated.length).padStart(2, "0")}
+        />
+        <KpiCard
+          icon="clients"
+          label="NEGOTIATED RATES"
+          note="Client exceptions on file"
+          tone="blue"
+          value={String(card.overrides.length).padStart(2, "0")}
+        />
       </section>
 
       <RateCardEditor canManage={canManage} card={card} />

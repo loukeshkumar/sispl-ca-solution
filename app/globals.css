@@ -14461,7 +14461,39 @@ button.kpi-card[aria-pressed="true"] {
 
 .rate-card-head,
 .rate-card-row {
-  grid-template-columns: minmax(160px, 1.4fr) 150px 170px 130px 140px;
+  /* Spread the spare width instead of dumping it all into the name column:
+     the charge and cost cells carry a line of explanation under the figure. */
+  grid-template-columns:
+    minmax(140px, 1.1fr) minmax(120px, 0.85fr) minmax(140px, 1fr)
+    minmax(130px, 0.95fr) 118px 122px;
+}
+
+.rate-margin {
+  font-variant-numeric: tabular-nums;
+}
+
+.rate-margin strong {
+  color: var(--mint-ink, var(--mint));
+}
+
+/* Charging below cost is the one number here that is simply wrong. */
+.rate-margin.is-negative strong {
+  color: var(--red);
+}
+
+.rate-margin.is-unknown strong {
+  color: var(--muted);
+}
+
+@media (max-width: 1150px) {
+  .rate-card-head {
+    display: none;
+  }
+
+  .rate-card-row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    row-gap: 10px;
+  }
 }
 
 .rate-override-head,
