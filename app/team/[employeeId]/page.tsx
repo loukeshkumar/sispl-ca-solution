@@ -25,7 +25,11 @@ import { buildExitClearance } from "../../../lib/team/offboarding-repository";
 import { indiaDateKey } from "../../../lib/attendance/calculations";
 import { listEmployeeActivity } from "../../../lib/team/repository";
 import { WorkspaceTabs } from "../../dashboard/workspace-tabs";
+import { listLeaveBalances } from "../../../lib/attendance/leave-ledger-repository";
 import { ActivityTimeline } from "./activity-timeline";
+import { listFirmUtilisation } from "../../../lib/rates/utilisation-repository";
+import { LeaveEntitlement } from "./leave-entitlement";
+import { UtilisationPanel } from "./utilisation-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -41,7 +45,8 @@ export default async function Employee360Page({ params, searchParams }: { params
   const canManage = hasPermission(session, "team:manage");
   const canReviewAttendance = hasPermission(session, "attendance:review");
   const canManageSalary = hasPermission(session, "salary:manage");
-  const [attendanceWorkspace, salaryData, bankAccount, capabilities, capabilityServices, trainingEvidence, clearance, activity] = await Promise.all([
+  const canReviewTime = hasPermission(session, "timesheets:manage");
+  const [attendanceWorkspace, salaryData, bankAccount, capabilities, capabilityServices, trainingEvidence, clearance, activity, leaveBalances, firmUtilisation] = await Promise.all([
     canReviewAttendance ? getAttendanceWorkspace(database, session.tenantId, session.userId, session.roleKey as Role).catch(() => null) : Promise.resolve(null),
     canManageSalary ? getSalaryStructureEditorData(database, session.tenantId, session.userId, employee.userId) : Promise.resolve(null),
     canManageSalary ? loadOptionalPanel("bank-account", () => getActiveBankAccount(database, session.tenantId, employee.userId), null) : Promise.resolve(null),
@@ -54,9 +59,19 @@ export default async function Employee360Page({ params, searchParams }: { params
       ? buildExitClearance(database, session.tenantId, employee.userId, indiaDateKey()).catch(() => null)
       : Promise.resolve(null),
     listEmployeeActivity(database, session.tenantId, employee.id).catch(() => []),
+    // Somebody's entitlement is theirs; only a reviewer of attendance sees it.
+    canReviewAttendance
+      ? listLeaveBalances(database, session.tenantId, employee.userId, indiaDateKey()).catch(() => [])
+      : Promise.resolve([]),
+    // Computed for the firm and read for one person: the same arithmetic the
+    // utilisation settings page reports, rather than a second implementation.
+    canReviewTime
+      ? listFirmUtilisation(database, session.tenantId, indiaDateKey().slice(0, 7)).catch(() => null)
+      : Promise.resolve(null),
   ]);
   const attendanceSummary = attendanceWorkspace?.team.find((member) => member.userId === employee.userId) ?? null;
   const monthlyGrossPaise = salaryData?.current?.lines.filter((line) => line.kind === "earning").reduce((sum, line) => sum + line.monthlyAmountPaise, 0) ?? null;
+  const personUtilisation = firmUtilisation?.people.find((row) => row.employeeUserId === employee.userId) ?? null;
   const disableError = (await searchParams).disableError;
   const todayKey = indiaDateKey();
   // Months rather than a date difference: "1y 4m" answers the question a date
@@ -173,6 +188,8 @@ export default async function Employee360Page({ params, searchParams }: { params
               {
                 badge: employee.tasks.length,
                 content: (
+                  <>
+                    {canReviewTime && <UtilisationPanel periodKey={indiaDateKey().slice(0, 7)} person={personUtilisation} />}
                   <section className="employee-task-register">
                     <div className="employee-overview-heading"><div><p className="eyebrow">ASSIGNED WORK</p><h2>Task register</h2></div><span>{employee.tasks.length} total</span></div>
                     <div className="employee-task-list">
@@ -180,6 +197,7 @@ export default async function Employee360Page({ params, searchParams }: { params
                       {!employee.tasks.length && <EmptyState description="Delivery work assigned to this employee appears here." icon="work" title="No tasks assigned" />}
                     </div>
                   </section>
+                  </>
                 ),
                 id: "work",
                 label: "Work",
@@ -187,6 +205,7 @@ export default async function Employee360Page({ params, searchParams }: { params
               {
                 content: (
                   <>
+                    {canReviewAttendance && <LeaveEntitlement balances={leaveBalances} leaveYear={leaveBalances[0]?.leaveYear ?? null} />}
                     {(attendanceSummary || canManageSalary) && <section className="employee-people-operations">
                       {attendanceSummary && <article><div><p className="eyebrow">ATTENDANCE</p><h3>Attendance overview</h3><span>Current monthly exception view</span></div><dl><div><dt>Present days</dt><dd>{attendanceSummary.presentDays}</dd></div><div><dt>Exceptions</dt><dd>{attendanceSummary.exceptionCount}</dd></div></dl><Link href="/?workspace=attendance">Open attendance</Link></article>}
                       {canManageSalary && <article><div><p className="eyebrow">CONFIDENTIAL PAYROLL</p><h3>Salary structure</h3><span>{salaryData?.current ? `Effective ${salaryData.current.effectiveFrom}` : "Not configured"}</span></div><dl><div><dt>Monthly gross</dt><dd>{monthlyGrossPaise === null ? "—" : formatPaise(monthlyGrossPaise)}</dd></div><div><dt>Components</dt><dd>{salaryData?.current?.lines.length ?? 0}</dd></div></dl><Link href={`/salary/structures/${employee.userId}`}>{salaryData?.current ? "Create new version" : "Configure salary"}</Link></article>}

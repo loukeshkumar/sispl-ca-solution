@@ -9330,6 +9330,175 @@ button.row-action-link {
 }
 
 
+/* ---- Employee utilisation ---------------------------------------------- */
+
+.employee-utilisation {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.utilisation-band {
+  border-radius: 999px;
+  font-size: var(--type-compact);
+  font-weight: 750;
+  padding: 4px 12px;
+  white-space: nowrap;
+}
+
+.utilisation-band.is-under { background: color-mix(in srgb, var(--red) 13%, transparent); color: var(--red); }
+.utilisation-band.is-on { background: color-mix(in srgb, var(--mint) 15%, transparent); color: var(--mint-ink, var(--mint)); }
+.utilisation-band.is-over { background: color-mix(in srgb, var(--blue) 13%, transparent); color: var(--blue); }
+.utilisation-band.is-unmeasured { background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--muted); }
+
+.utilisation-figures {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  margin: 0;
+}
+
+.utilisation-figures > div {
+  background: color-mix(in srgb, var(--input-surface) 60%, transparent);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  display: grid;
+  gap: 2px;
+  padding: 12px 14px;
+}
+
+.utilisation-figures dt {
+  color: var(--muted);
+  font-size: var(--type-label);
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.utilisation-figures dd {
+  font-size: var(--type-kpi);
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  line-height: 1.1;
+  margin: 0;
+}
+
+.utilisation-figures dd.is-under { color: var(--red); }
+.utilisation-figures dd.is-on { color: var(--mint-ink, var(--mint)); }
+.utilisation-figures dd.is-over { color: var(--blue); }
+
+.utilisation-figures span {
+  color: var(--muted);
+  font-size: var(--type-compact);
+}
+
+/* A share measured on an incomplete timesheet is a different fact. */
+.utilisation-caveat {
+  background: color-mix(in srgb, var(--amber) 9%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--amber) 30%, var(--line));
+  border-radius: 12px;
+  color: var(--ink);
+  font-size: var(--type-compact);
+  margin: 0;
+  padding: 10px 14px;
+}
+
+/* ---- Employee leave entitlement ---------------------------------------- */
+
+.leave-entitlement {
+  display: grid;
+  gap: 14px;
+}
+
+.leave-balance-list {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.leave-balance {
+  align-items: center;
+  background: color-mix(in srgb, var(--input-surface) 60%, transparent);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  column-gap: 16px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) 88px minmax(0, 1.4fr);
+  padding: 12px 16px;
+  row-gap: 8px;
+}
+
+.leave-balance-name {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.leave-balance-name strong {
+  font-size: var(--type-supporting);
+  font-weight: 750;
+}
+
+.leave-balance small {
+  color: var(--muted);
+  font-size: var(--type-compact);
+}
+
+.leave-balance-figure {
+  display: grid;
+  gap: 0;
+  text-align: right;
+}
+
+.leave-balance-figure strong {
+  font-size: var(--type-kpi);
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+/* Nothing left to take is the one state worth colouring. */
+.leave-balance.is-spent .leave-balance-figure strong {
+  color: var(--red);
+}
+
+.leave-balance-detail {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.leave-balance-bar {
+  background: color-mix(in srgb, var(--ink) 9%, transparent);
+  border-radius: 999px;
+  display: block;
+  height: 8px;
+  overflow: hidden;
+}
+
+.leave-balance-bar i {
+  background: var(--accent);
+  border-radius: 999px;
+  display: block;
+  height: 100%;
+}
+
+.leave-balance.is-spent .leave-balance-bar i {
+  background: var(--red);
+}
+
+@media (max-width: 720px) {
+  .leave-balance {
+    grid-template-columns: minmax(0, 1fr) 80px;
+  }
+
+  .leave-balance-detail {
+    grid-column: 1 / -1;
+  }
+}
+
 /* ---- Employee 360: summary strip and history --------------------------- */
 
 .employee-360-kpis {
