@@ -11,7 +11,12 @@
  * string as a TCP port and any other string as a pipe path, so the same line
  * serves iisnode in production and `node server.js` on 3000 locally.
  *
- * The package is ESM (`"type": "module"`), so this file is ESM too.
+ * The package is ESM (`"type": "module"`), so this file is ESM too — and
+ * iisnode's interceptor loads the startup file with `require()`. Node can
+ * require an ESM module, but not one whose graph contains top-level `await`:
+ * that throws ERR_REQUIRE_ASYNC_MODULE before the server is ever created. So
+ * `prepare()` is a promise chain here rather than a top-level await, and this
+ * file must stay free of top-level await to keep loading under iisnode.
  */
 import { createServer } from "node:http";
 
@@ -23,8 +28,6 @@ const listenTarget = process.env.PORT ?? 3000;
 // the site root, so the app directory is taken from this file's own location.
 const app = next({ dev: false, dir: import.meta.dirname });
 const handle = app.getRequestHandler();
-
-await app.prepare();
 
 const server = createServer((request, response) => {
   handle(request, response).catch((error) => {
@@ -41,6 +44,14 @@ server.on("error", (error) => {
   process.exit(1);
 });
 
-server.listen(listenTarget, () => {
-  console.log(`Ready on ${listenTarget}`);
-});
+app.prepare().then(
+  () => {
+    server.listen(listenTarget, () => {
+      console.log(`Ready on ${listenTarget}`);
+    });
+  },
+  (error) => {
+    console.error("Next.js failed to prepare", error);
+    process.exit(1);
+  },
+);
