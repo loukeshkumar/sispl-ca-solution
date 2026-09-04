@@ -9,7 +9,7 @@ The same source tree has two explicit modes:
 - `demo` is the default. It uses deterministic fictitious records without requiring PostgreSQL.
 - `postgres` reads the local PostgreSQL database and never falls back to demo data when configuration, connection, or queries fail.
 
-Set local mode only in ignored `.env.local`:
+Set local mode only in an ignored env file. Every `*:local` script reads `.env` and then `.env.local`, either of which may be absent, so a host keeping a single `.env` needs no renaming and a developer's `.env.local` overrides it:
 
 ```dotenv
 SISPL_DATA_SOURCE=postgres
@@ -44,7 +44,7 @@ npm run lint
 
 A change that adds a module or alters a workflow must update the in-product manual (`app/manual/`) in the same commit. `test:unit` enforces the mechanical part — every sidebar destination, routed page, and typed workflow state must be documented — and [AGENTS.md](AGENTS.md) states the rule in full.
 
-`test:integration` requires `.env.local` and creates/uses an isolated database ending in `_test`; it never runs lifecycle mutations against the development database. It checks connectivity, repeated seeding, concurrent authentication throttles, composite tenant constraints, employee access provisioning, task ownership/state transitions, attendance locking, payroll approval/publication/payment, payslip privacy, and complete audited client, compliance-work, and document lifecycles.
+`test:integration` requires `.env` or `.env.local`, drops and recreates an isolated database ending in `_test` on every run so back-to-back runs are repeatable, and creates/uses an isolated database ending in `_test`; it never runs lifecycle mutations against the development database. It checks connectivity, repeated seeding, concurrent authentication throttles, composite tenant constraints, employee access provisioning, task ownership/state transitions, attendance locking, payroll approval/publication/payment, payslip privacy, and complete audited client, compliance-work, and document lifecycles.
 
 ## Architecture
 

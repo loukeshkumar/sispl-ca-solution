@@ -110,8 +110,11 @@ export default function StartChapters() {
             <Terminal lines={["create database sispl_ca_solution;"]} />
           </li>
           <li>
-            <strong>Create your local environment file.</strong> Copy <code>.env.example</code> to <code>.env.local</code> and
-            replace only the placeholders. <code>.env.local</code> is git-ignored and must stay that way.
+            <strong>Create your environment file.</strong> Copy <code>.env.example</code> to <code>.env.local</code> and
+            replace only the placeholders. Both are git-ignored and must stay that way. Every <code>*:local</code> script
+            reads <code>.env</code> first and then <code>.env.local</code>, either of which may be absent &mdash; so a
+            deployed host that keeps a single <code>.env</code> works without renaming anything, and a developer keeping
+            their own overrides in <code>.env.local</code> has them win, which is the order Next.js itself uses.
             <Terminal
               lines={[
                 "SISPL_DATA_SOURCE=postgres",

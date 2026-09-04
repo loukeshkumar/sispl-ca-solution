@@ -34,7 +34,7 @@ SISPL_PUBLIC_URL=http://localhost:3000
 AUTH_TRUST_PROXY_HEADERS=false
 ```
 
-Do not commit `.env.local`. If the password contains URL-reserved characters, percent-encode it in the URL.
+Do not commit `.env` or `.env.local`. Scripts read `.env` first and `.env.local` second, so either alone is enough and `.env.local` wins where both set the same key. If the password contains URL-reserved characters, percent-encode it in the URL.
 
 ## 4. Migrate, seed, and check
 

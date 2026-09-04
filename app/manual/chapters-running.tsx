@@ -170,10 +170,12 @@ export default function RunningChapters() {
         />
 
         <p>
-          <strong>The integration suite never touches your development database.</strong> It requires <code>.env.local</code>
+          <strong>The integration suite never touches your development database.</strong> It requires <code>.env</code> or <code>.env.local</code>
           and derives an isolated database whose name must end in <code>_test</code>; by default
           <code> sispl_ca_solution</code> becomes <code>sispl_ca_solution_test</code>. Set <code>DATABASE_URL_TEST</code> only
-          when you need a different isolated <code>_test</code> database, and the role must be able to create it on first run.
+          when you need a different isolated <code>_test</code> database, and the role must be able to create and drop it.
+          That database is dropped and rebuilt on <em>every</em> run, not reused: a run that fails part-way leaves its
+          fixtures behind, and a suite whose result depends on what the last run left is one nobody can trust.
         </p>
 
         <p>
@@ -232,7 +234,7 @@ export default function RunningChapters() {
           <table className="manual-table">
             <thead><tr><th>Symptom</th><th>Cause and fix</th></tr></thead>
             <tbody>
-              <tr><td><code>DATABASE_URL is required</code></td><td>No <code>.env.local</code>. Create it from <code>.env.example</code>.</td></tr>
+              <tr><td><code>DATABASE_URL is required</code></td><td>Neither <code>.env</code> nor <code>.env.local</code> holds it. Create one from <code>.env.example</code>.</td></tr>
               <tr>
                 <td>Database-unavailable screen</td>
                 <td>PostgreSQL mode does not substitute demo data. Confirm PostgreSQL is running, the host and port are reachable, and the role can access the database, then run <code>npm run db:check:local</code>.</td>
