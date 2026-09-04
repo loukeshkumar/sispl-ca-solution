@@ -58,7 +58,7 @@ export const manualParts: ManualPart[] = [
     sections: [
       { id: "jobs", title: "Scheduled jobs", summary: "Three idempotent jobs that generate obligations, accrue leave, and send alerts." },
       { id: "permissions", title: "Permission reference", summary: "Every permission, and what each of the four legacy roles holds." },
-      { id: "operations", title: "Operations and backups", summary: "Validating a build, backing up correctly, and the boundaries not to weaken." },
+      { id: "operations", title: "Operations and backups", summary: "How the server runs the application under PM2, validating a build, backing up correctly, and the boundaries not to weaken." },
       { id: "troubleshooting", title: "Troubleshooting", summary: "The failures you are most likely to hit, and what each one actually means." },
       { id: "appendix", title: "Appendix", summary: "Commands, environment variables, direct URLs, and the vocabulary." },
     ],

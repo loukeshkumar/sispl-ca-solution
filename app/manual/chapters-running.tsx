@@ -158,6 +158,57 @@ export default function RunningChapters() {
       </Chapter>
 
       <Chapter id="operations">
+        <h3>How the application runs on the server</h3>
+        <p>
+          On the Windows host, <strong>PM2 owns the Node process</strong> and IIS sits in front of it as a reverse proxy.
+          IIS terminates HTTPS for the domain and forwards everything dynamic to <code>127.0.0.1:3022</code>, where
+          <code> server.js</code> listens. IIS does not launch the application and does not restart it; that is PM2&rsquo;s
+          job, which is the whole reason for the arrangement &mdash; a crash is handled by a process manager whose only
+          job that is, rather than by a web server that also has to answer the request.
+        </p>
+
+        <Terminal
+          lines={[
+            "# first time on a host",
+            "npm install -g pm2",
+            "npm install -g @jessety/pm2-installer   # registers PM2 as a Windows service",
+            "",
+            "# start, and remember it across reboots",
+            "pm2 start ecosystem.config.cjs",
+            "pm2 save",
+            "",
+            "# every deploy after that",
+            "git fetch origin main && git reset --hard origin/main",
+            "npm ci && npm run build",
+            "pm2 reload sispl-ca-solution",
+          ]}
+        />
+
+        <Note tag="Three things that are easy to miss" tone="care">
+          <ul>
+            <li>
+              IIS needs <strong>Application Request Routing</strong> as well as URL Rewrite. Without ARR a rewrite to an
+              <code> http://</code> address does not proxy &mdash; it returns 404, which reads exactly like a routing
+              mistake. Confirm with <code>Get-WebGlobalModule</code> and enable proxying at server level.
+            </li>
+            <li>
+              <strong>Plesk&rsquo;s Node.js must be disabled</strong> for the domain. Leaving it on means two things are
+              trying to run the same application.
+            </li>
+            <li>
+              Set <code>AUTH_TRUST_PROXY_HEADERS=true</code>. Every request now arrives from <code>127.0.0.1</code>, and
+              without it the sign-in rate limiter counts the entire firm as a single client and locks everyone out
+              together.
+            </li>
+          </ul>
+        </Note>
+
+        <p>
+          <code>pm2 logs sispl-ca-solution</code> shows the application&rsquo;s own output; <code>pm2 status</code> shows
+          whether it is up and how many times it has restarted. A restart count that keeps climbing is the signal to read
+          the logs rather than restart it again.
+        </p>
+
         <h3>Validation before a deploy</h3>
         <Terminal
           lines={[

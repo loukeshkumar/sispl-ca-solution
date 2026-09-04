@@ -44,6 +44,21 @@ npm run lint
 
 A change that adds a module or alters a workflow must update the in-product manual (`app/manual/`) in the same commit. `test:unit` enforces the mechanical part — every sidebar destination, routed page, and typed workflow state must be documented — and [AGENTS.md](AGENTS.md) states the rule in full.
 
+## Running on the server
+
+PM2 owns the Node process; IIS sits in front as a reverse proxy, terminating HTTPS and forwarding to `127.0.0.1:3022` where `server.js` listens. IIS neither launches nor restarts the application — that is PM2's job, which is the point of the arrangement.
+
+```
+npm install -g pm2 @jessety/pm2-installer   # once per host; the installer registers PM2 as a Windows service
+pm2 start ecosystem.config.cjs && pm2 save
+
+git fetch origin main && git reset --hard origin/main   # every deploy
+npm ci && npm run build
+pm2 reload sispl-ca-solution
+```
+
+IIS needs Application Request Routing as well as URL Rewrite, or a rewrite to an `http://` address returns 404 instead of proxying. Plesk's Node.js must be disabled for the domain. Set `AUTH_TRUST_PROXY_HEADERS=true` on the host, or the sign-in rate limiter counts the whole firm as one client. [web.config](web.config) states all three at the top.
+
 To stand up a demonstration host from an empty database, `npm run db:sample` runs migrate, seed and check, then loads demonstration history — a closed attendance month carried through to a paid payroll run, invoices, documents, timesheets and registers. It writes a fictitious firm into whatever `DATABASE_URL` points at, so it is not the command to run against a real firm's data; `db:setup:local` alone gives masters and nothing invented.
 
 `test:integration` requires `.env` or `.env.local` and drops and recreates an isolated database ending in `_test` on every run, so back-to-back runs are repeatable; it never runs lifecycle mutations against the development database. It checks connectivity, repeated seeding, concurrent authentication throttles, composite tenant constraints, employee access provisioning, task ownership/state transitions, attendance locking, payroll approval/publication/payment, payslip privacy, and complete audited client, compliance-work, and document lifecycles.

@@ -39,3 +39,9 @@ next-env.d.ts
 *.tsbuildinfo
 /.worktrees/
 /.data/
+
+# pm2 process logs (see ecosystem.config.cjs)
+/logs/
+
+# iisnode logs, if the host ever ran that way
+/iisnode/
