@@ -44,7 +44,9 @@ npm run lint
 
 A change that adds a module or alters a workflow must update the in-product manual (`app/manual/`) in the same commit. `test:unit` enforces the mechanical part — every sidebar destination, routed page, and typed workflow state must be documented — and [AGENTS.md](AGENTS.md) states the rule in full.
 
-`test:integration` requires `.env` or `.env.local`, drops and recreates an isolated database ending in `_test` on every run so back-to-back runs are repeatable, and creates/uses an isolated database ending in `_test`; it never runs lifecycle mutations against the development database. It checks connectivity, repeated seeding, concurrent authentication throttles, composite tenant constraints, employee access provisioning, task ownership/state transitions, attendance locking, payroll approval/publication/payment, payslip privacy, and complete audited client, compliance-work, and document lifecycles.
+To stand up a demonstration host from an empty database, `npm run db:sample` runs migrate, seed and check, then loads demonstration history — a closed attendance month carried through to a paid payroll run, invoices, documents, timesheets and registers. It writes a fictitious firm into whatever `DATABASE_URL` points at, so it is not the command to run against a real firm's data; `db:setup:local` alone gives masters and nothing invented.
+
+`test:integration` requires `.env` or `.env.local` and drops and recreates an isolated database ending in `_test` on every run, so back-to-back runs are repeatable; it never runs lifecycle mutations against the development database. It checks connectivity, repeated seeding, concurrent authentication throttles, composite tenant constraints, employee access provisioning, task ownership/state transitions, attendance locking, payroll approval/publication/payment, payslip privacy, and complete audited client, compliance-work, and document lifecycles.
 
 ## Architecture
 
