@@ -186,7 +186,15 @@ export default function PeopleChapters() {
             />
           </li>
           <li>Add <strong>invoice lines</strong> &mdash; description and amount in INR.</li>
-          <li>Enter the <strong>tax amount</strong>. It is entered as reviewed, by you. SISPL does not compute GST.</li>
+          <li>
+            Enter the <strong>tax amount</strong>. It is entered as reviewed, by you &mdash; SISPL does not work out
+            what the tax should be, and applies no rate. What it does do is decide how the amount you entered is
+            <em> split</em>: it compares the firm&rsquo;s state against the place of supply, and records CGST and SGST
+            in equal halves for a supply inside the state, or the whole amount as IGST for one that crosses a state
+            line. Set the firm&rsquo;s state and each client&rsquo;s state, or an invoice cannot be issued: an issued
+            invoice is a document somebody files from, so it must say where the supply landed. An odd number of paise
+            on an intra-state supply is rounded down by one, because the two halves have to be equal.
+          </li>
           <li>Save as a draft.</li>
         </Steps>
 

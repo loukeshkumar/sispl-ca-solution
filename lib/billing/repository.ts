@@ -3,6 +3,8 @@ import { and, asc, desc, eq, inArray, isNull, lte, ne, or, gte, sql } from "driz
 
 import { auditEvents, clientPackageAssignments, invoiceLines, invoices, legalEntities, tenants } from "../../db/schema";
 import type { DashboardDatabase } from "../dashboard/postgres/repository";
+import { ZERO_SPLIT, type SupplyType, type TaxSplit } from "./gst";
+import { taxIdentityFor } from "./settlement-repository";
 import { releaseEntries } from "./time-billing-repository";
 import { invoiceSubtotalPaise, type InvoiceInput, type InvoiceLineType, type InvoiceStatus } from "./validation";
 
@@ -209,6 +211,23 @@ export async function listInvoiceFormOptions(database: DashboardDatabase, tenant
   return { clients, assignments };
 }
 
+/**
+ * Splits a tax amount the firm has typed, rather than one derived from a rate.
+ *
+ * `invoices_gst_split_check` demands CGST and SGST be *equal* on an intra-state
+ * supply, so an odd number of paise cannot be halved and stored. The amount is
+ * rounded down to the nearest even paisa instead of being rejected: the firm
+ * entered a total, and refusing an invoice over a single paisa would be worse
+ * than charging it one paisa less. A supply that carries no tax — export or
+ * exempt — carries none here either, whatever was typed.
+ */
+function splitDeclaredTax(supplyType: SupplyType, declaredPaise: number): TaxSplit {
+  if (declaredPaise <= 0 || supplyType === "export" || supplyType === "exempt") return ZERO_SPLIT;
+  if (supplyType === "inter_state") return { cgstPaise: 0, igstPaise: declaredPaise, sgstPaise: 0, taxPaise: declaredPaise };
+  const half = Math.floor(declaredPaise / 2);
+  return { cgstPaise: half, igstPaise: 0, sgstPaise: half, taxPaise: half * 2 };
+}
+
 export async function createInvoice(database: DashboardDatabase, tenantId: string, actorUserId: string, input: InvoiceInput) {
   requireActor(tenantId, actorUserId);
   return database.transaction(async (transaction) => {
@@ -230,6 +249,15 @@ export async function createInvoice(database: DashboardDatabase, tenantId: strin
     const invoiceSeq = sequence?.next ?? 1;
     const subtotalPaise = invoiceSubtotalPaise(input.lines);
     const id = randomUUID();
+
+    // Who supplied this and where the supply landed. It is stamped at creation
+    // rather than at issue because `invoices_issued_tax_identity_check` refuses
+    // to let an invoice reach `issued` without it, and `issueInvoice` — the path
+    // the Billing workspace uses — never wrote these columns, so every issue
+    // attempt failed against the constraint.
+    const identity = await taxIdentityFor(transaction as unknown as DashboardDatabase, tenantId, input.legalEntityId);
+    const split = splitDeclaredTax(identity.supplyType, input.taxPaise);
+
     await transaction.insert(invoices).values({
       id,
       tenantId,
@@ -241,8 +269,17 @@ export async function createInvoice(database: DashboardDatabase, tenantId: strin
       notes: input.notes,
       status: "draft",
       subtotalPaise,
-      taxPaise: input.taxPaise,
-      totalPaise: subtotalPaise + input.taxPaise,
+      taxPaise: split.taxPaise,
+      totalPaise: subtotalPaise + split.taxPaise,
+      supplierGstin: identity.supplierGstin,
+      supplierStateCode: identity.supplierStateCode,
+      recipientGstin: identity.recipientGstin,
+      recipientStateCode: identity.recipientStateCode,
+      placeOfSupplyCode: identity.placeOfSupplyCode,
+      supplyType: identity.supplyType,
+      cgstPaise: split.cgstPaise,
+      sgstPaise: split.sgstPaise,
+      igstPaise: split.igstPaise,
       createdByUserId: actorUserId,
     });
     await transaction.insert(invoiceLines).values(input.lines.map((line, index) => ({

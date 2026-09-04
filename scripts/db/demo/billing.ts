@@ -19,16 +19,11 @@ const PACKAGE_CODE = "DEMO-RETAINER";
 const PACKAGE_FEE_PAISE = 2_500_000;
 
 /**
- * Zero, deliberately.
- *
- * `invoices_gst_component_check` requires cgst + sgst + igst to equal taxPaise,
- * but `createInvoice` never writes those three columns, so they default to zero
- * and any invoice carrying tax is rejected by the database. Until that is
- * reconciled, an invoice the demo can actually create is one with no tax on it.
- * The seed does not work around the constraint by inserting rows behind the
- * service — that would hide a real defect rather than respect it.
+ * 18% of the retainer. `createInvoice` resolves the supply type and splits this
+ * across CGST and SGST or into IGST, so the components sum to the tax charged
+ * and `invoices_gst_component_check` is satisfied rather than violated.
  */
-const TAX_PAISE = 0;
+const TAX_PAISE = 450_000;
 
 async function ensurePackage(database: DashboardDatabase, context: DemoContext) {
   const [existing] = await database.select({ id: servicePackages.id }).from(servicePackages).where(and(

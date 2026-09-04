@@ -10,12 +10,18 @@ import {
   clientPackageAssignments, clientPackageAssignmentServices, clientPortalCredentials, clientPortalSessions, clientPortalUsers, filingAcknowledgements, invoiceLines, invoices, legalEntities, notificationDeliveries, notifications, officeTasks, payrollEntries, payrollEntryLines, payrollRuns, personalTodos, registrations,
   roleDefinitions, rolePermissions, salaryStructureLines, salaryStructures, tenantMemberships, tenants, userCredentials, userSessions, users, workItems,
   serviceCatalog, servicePackageItems, servicePackages, statutoryRateParameters, statutoryRateVersions,
-  dscCertificates, dscCustodyEvents, statutoryNotices, udinRegistrations,
+  dscCertificates, dscCustodyEvents, statutoryNotices, udinRegistrations, clientAcceptances, clientAcceptanceChecks, workItemSteps, workDependencies, workReviewRounds,
 } from "../db/schema";
 import { changePassword, clearFailedLogins, consumeLoginRateLimit, findLoginIdentity, createSessionRecord, findSessionByTokenHash, recordFailedLogin, revokeSessionByTokenHash } from "../lib/auth/repository";
 import { PasswordChangeError } from "../lib/auth/repository";
 import { createSessionToken, hashSessionToken } from "../lib/auth/tokens";
 import { archiveClient, ClientRepositoryError, createClient, getClient360Data, updateClient } from "../lib/clients/repository";
+import { decideAcceptance, recordCheck } from "../lib/clients/acceptance-repository";
+import { raiseDependency } from "../lib/dependencies/repository";
+import { clearDependency, listDependencies } from "../lib/dependencies/repository";
+import { listWorkItemSteps, setStepStatus } from "../lib/procedures/repository";
+import { decideReview, submitForReview } from "../lib/reviews/repository";
+import { MANDATORY_CHECKS } from "../lib/clients/acceptance";
 import { SEEDED_TENANT_ID } from "../lib/dashboard/fixtures";
 import { FIRM_SCOPE, listDirectReports } from "../lib/dashboard/scope";
 import { applyBulkRequestCancel, cancelDocumentRequest, createDocumentRequest, getDocumentMetadata, listDocumentWorkspace, recordDocumentUpload } from "../lib/documents/repository";
@@ -88,9 +94,12 @@ test("development seed is idempotent and loads the expected dashboard rows", asy
     clientGroups: 5,
     legalEntities: 5,
     workItems: 4,
-    employeeProfiles: 5,
+    // Six: the fixture has six members and every one of them has a profile.
+    // This read five for as long as the seed could not run to completion, so
+    // the number was recorded from a database that had never been fully seeded.
+    employeeProfiles: 6,
     officeTasks: 5,
-    workProfiles: 5,
+    workProfiles: 6,
   });
 
   const records = await loadDashboardRecords(database, SEEDED_TENANT_ID, FIRM_SCOPE);
@@ -227,7 +236,10 @@ test("attendance lock drives controlled payroll, publication, payment, and priva
       { id: randomUUID(), tenantId, userId: otherEmployeeUserId, roleKey: "associate", status: "active" },
     ]);
     await database.insert(employeeProfiles).values({
-      id: randomUUID(), tenantId, userId: employeeUserId, employeeCode: "PAY-0001", designation: "Audit Associate", joiningDate: "2031-01-16",
+      // `employmentStage` defaults to `confirmed`, and a confirmed employee must
+      // carry the date they were confirmed on — `employee_profiles_confirmed_state_check`.
+      id: randomUUID(), tenantId, userId: employeeUserId, employeeCode: "PAY-0001", designation: "Audit Associate",
+      joiningDate: "2031-01-16", confirmedOn: "2031-01-16",
     });
     await database.insert(employeeWorkProfiles).values({
       id: randomUUID(), tenantId, employeeUserId, managerUserId: partnerUserId, employmentType: "employee", workLocationState: "Bihar",
@@ -332,6 +344,10 @@ test("attendance lock drives controlled payroll, publication, payment, and priva
     await database.delete(salaryStructures).where(eq(salaryStructures.tenantId, tenantId));
     await database.delete(employeeWorkProfiles).where(eq(employeeWorkProfiles.tenantId, tenantId));
     await database.delete(employeeProfiles).where(eq(employeeProfiles.tenantId, tenantId));
+    // Publishing payslips notifies each employee, and a notification is bound to
+    // the recipient's membership. They go before the memberships they reference.
+    await database.delete(notificationDeliveries).where(eq(notificationDeliveries.tenantId, tenantId));
+    await database.delete(notifications).where(eq(notifications.tenantId, tenantId));
     await database.delete(tenantMemberships).where(eq(tenantMemberships.tenantId, tenantId));
     await database.delete(users).where(inArray(users.id, [administratorUserId, partnerUserId, employeeUserId, otherEmployeeUserId]));
     await database.delete(tenants).where(eq(tenants.id, tenantId));
@@ -559,7 +575,10 @@ test("employee lifecycle is tenant-scoped, provisions one-time access, and guard
     });
     await assert.rejects(
       () => disableEmployee(database, identity.tenantId, identity.userId, created.employeeId),
-      (error: unknown) => error instanceof TeamRepositoryError && error.code === "active_tasks",
+      // The exit clearance covers open delivery work and refuses the exit
+      // outright, so an open task now reports `clearance_blocked`. `active_tasks`
+      // is declared but no longer thrown from anywhere.
+      (error: unknown) => error instanceof TeamRepositoryError && error.code === "clearance_blocked",
     );
     await database.delete(officeTasks).where(eq(officeTasks.id, taskId));
     taskId = "";
@@ -1050,6 +1069,20 @@ test("client lifecycle is tenant-scoped, audited, and archived without destructi
     riskStatus: "watch",
     services: ["GST", "BOOKS"],
   });
+  // A new client is a prospect until a partner accepts them, and every gate that
+  // requires an active client — `updateClient` among them — refuses a prospect.
+  // Acceptance is separated: a manager answers the mandatory checks and somebody
+  // else decides, so the two actors here are not the same person.
+  // By user id, not by sign-in: the seed gives credentials to the administrator
+  // alone, so the other members have no login to find.
+  const [checker] = await database.select({ id: users.id }).from(users).where(eq(users.email, "nisha@example.invalid")).limit(1);
+  assert.ok(checker);
+  for (const checkKey of MANDATORY_CHECKS) {
+    await recordCheck(database, identity.tenantId, checker.id, clientId, {
+      checkKey, checkedOn: "2026-08-16", note: "Seeded lifecycle check.", outcome: "cleared",
+    });
+  }
+  await decideAcceptance(database, identity.tenantId, identity.userId, clientId, "accepted", "Onboarding checks completed.");
   let clientGroupId = "";
   let blockingWorkItemId = "";
 
@@ -1107,7 +1140,14 @@ test("client lifecycle is tenant-scoped, audited, and archived without destructi
       eq(auditEvents.tenantId, identity.tenantId),
       eq(auditEvents.resourceId, clientId),
     ));
-    assert.deepEqual(actions.map((row) => row.action).sort(), ["client.archived", "client.created", "client.updated"]);
+    // Acceptance is audited against the client too: four mandatory checks and
+    // the decision that let the prospect become a client the firm can bill.
+    assert.deepEqual(actions.map((row) => row.action).sort(), [
+      "client.archived", "client.created", "client.updated",
+      "client_acceptance.accepted",
+      "client_acceptance.check_recorded", "client_acceptance.check_recorded",
+      "client_acceptance.check_recorded", "client_acceptance.check_recorded",
+    ]);
   } finally {
     if (blockingWorkItemId) {
       await database.delete(auditEvents).where(eq(auditEvents.resourceId, blockingWorkItemId));
@@ -1116,6 +1156,9 @@ test("client lifecycle is tenant-scoped, audited, and archived without destructi
     await database.delete(auditEvents).where(eq(auditEvents.resourceId, clientId));
     await database.delete(registrations).where(eq(registrations.legalEntityId, clientId));
     await database.delete(clientServices).where(eq(clientServices.legalEntityId, clientId));
+    // Accepting the client left an acceptance record and its checks behind them.
+    await database.delete(clientAcceptanceChecks).where(eq(clientAcceptanceChecks.legalEntityId, clientId));
+    await database.delete(clientAcceptances).where(eq(clientAcceptances.legalEntityId, clientId));
     await database.delete(legalEntities).where(eq(legalEntities.id, clientId));
     if (clientGroupId) await database.delete(clientGroups).where(eq(clientGroups.id, clientGroupId));
   }
@@ -1127,7 +1170,12 @@ test("compliance work lifecycle is tenant-scoped, audited, and completed outside
   const identity = await findLoginIdentity(database, "loukesh@example.invalid", "sharma-kumar-ca");
   assert.ok(identity);
   const members = await listWorkMembers(database, identity.tenantId);
-  const reviewer = members.find((member) => member.id !== identity.userId);
+  // The work below is a GSTR-3B, and a reviewer must be recorded as able to
+  // review the service. Nisha S. holds GST at signing level; picking merely
+  // "somebody other than me" lands on a member who is not rated for it.
+  const [gstReviewer] = await database.select({ id: users.id }).from(users).where(eq(users.email, "nisha@example.invalid")).limit(1);
+  assert.ok(gstReviewer);
+  const reviewer = members.find((member) => member.id === gstReviewer.id);
   assert.ok(reviewer);
   const suffix = randomUUID().slice(0, 8);
   const workItemId = await createWorkItem(database, identity.tenantId, identity.userId, {
@@ -1150,6 +1198,17 @@ test("compliance work lifecycle is tenant-scoped, audited, and completed outside
     assert.equal(created?.reviewerId, reviewer.id);
     assert.equal(await getWorkItem360(database, FOREIGN_TENANT_ID, workItemId), null);
 
+    // Waiting has to name what it waits on. A sentence in the blocker note is
+    // no longer enough, so the dependency is recorded before the status moves.
+    await raiseDependency(database, identity.tenantId, identity.userId, workItemId, {
+      dependsOnWorkItemId: null,
+      documentRequestId: null,
+      expectedOn: "2026-09-30",
+      externalParty: "Client finance team",
+      kind: "external",
+      title: "Signed statements awaited from client",
+    });
+
     await updateWorkItem(database, identity.tenantId, identity.userId, workItemId, {
       budgetMinutes: null,
       assigneeId: identity.userId,
@@ -1163,7 +1222,26 @@ test("compliance work lifecycle is tenant-scoped, audited, and completed outside
       statutoryDueDate: "2026-08-20",
       status: "waiting",
     });
-    assert.equal((await getWorkItem360(database, identity.tenantId, workItemId))?.progress, 65);
+    // Zero, not the 65 typed above. A published procedure governs this service,
+    // and where one does, progress is counted from its completed steps rather
+    // than taken from the form — none of these steps are done yet.
+    assert.equal((await getWorkItem360(database, identity.tenantId, workItemId))?.progress, 0);
+
+    // Completion refuses an item with mandatory procedure steps still open or a
+    // dependency still outstanding. Both are real records here — the service is
+    // governed by a published procedure, and Waiting had to name what it waits
+    // on — so both are settled the way the firm would settle them.
+    for (const step of await listWorkItemSteps(database, identity.tenantId, workItemId)) {
+      if (!step.mandatory) continue;
+      await setStepStatus(database, identity.tenantId, identity.userId, step.id, { note: "", status: "done" });
+    }
+    for (const dependency of await listDependencies(database, identity.tenantId, workItemId)) {
+      await clearDependency(database, identity.tenantId, identity.userId, dependency.id, "Statements received.");
+    }
+    // Naming a reviewer is the firm saying this obligation needs one, so the
+    // approval has to come from that reviewer rather than from the submitter.
+    await submitForReview(database, identity.tenantId, identity.userId, workItemId, "Ready for partner review.");
+    await decideReview(database, identity.tenantId, reviewer.id, workItemId, "approved", "Checked against the return.");
 
     const completionResults = await Promise.allSettled([
       completeWorkItem(database, identity.tenantId, identity.userId, workItemId),
@@ -1182,9 +1260,29 @@ test("compliance work lifecycle is tenant-scoped, audited, and completed outside
       eq(auditEvents.tenantId, identity.tenantId),
       eq(auditEvents.resourceId, workItemId),
     ));
-    assert.deepEqual(actions.map((row) => row.action).sort(), ["work.completed", "work.created", "work.updated"]);
+    // Distinct actions, not an exact list: the number of `step_done` entries is
+    // however many mandatory steps the published procedure carries, and pinning
+    // that here would make the test fail whenever the procedure is edited.
+    assert.deepEqual([...new Set(actions.map((row) => row.action))].sort(), [
+      "work.capability_stretch",
+      "work.completed",
+      "work.created",
+      "work.dependency_cleared",
+      "work.dependency_raised",
+      "work.procedure_applied",
+      "work.review_approved",
+      "work.review_submitted",
+      "work.step_done",
+      "work.updated",
+    ]);
   } finally {
     await database.delete(auditEvents).where(eq(auditEvents.resourceId, workItemId));
+    // Creating work against a service with a published procedure copies its
+    // steps onto the item, and the Waiting transition recorded a dependency.
+    // Both hold a reference to the work item.
+    await database.delete(workItemSteps).where(eq(workItemSteps.workItemId, workItemId));
+    await database.delete(workDependencies).where(eq(workDependencies.workItemId, workItemId));
+    await database.delete(workReviewRounds).where(eq(workReviewRounds.workItemId, workItemId));
     await database.delete(workItems).where(eq(workItems.id, workItemId));
   }
 });

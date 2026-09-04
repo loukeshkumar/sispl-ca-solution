@@ -127,6 +127,20 @@ const employeeProfilesByName: Record<string, SeedProfile> = {
   "Ayesha K.": { designation: "Articled Assistant", mobileNumber: "", joiningDate: "2025-09-01", notes: "Practical training under CA Priya M.", qualification: "articled", membershipNumber: "", qualifiedOn: null, employmentStage: "probation", probationEndDate: "2026-03-01" },
 };
 
+/**
+ * GST state codes for the seeded clients, taken from the city each already
+ * carries. An issued invoice must state where the supply landed —
+ * `invoices_issued_tax_identity_check` refuses one that does not — so a client
+ * with no state code cannot be billed at all.
+ */
+const stateCodeByCity: Record<string, string> = {
+  "Patna, Bihar": "10",
+  "Gurugram, Haryana": "06",
+  "New Delhi": "07",
+  "Kolkata, West Bengal": "19",
+  "Noida, Uttar Pradesh": "09",
+};
+
 const managerByName: Record<string, string | undefined> = {
   "Nisha S.": "Priya M.",
   "Rahul K.": "Priya M.",
@@ -266,8 +280,14 @@ export async function seedDevelopmentData(
   const adminPasswordHash = await hashPassword(options.adminPassword ?? developmentAdminPassword(process.env));
 
   await database.transaction(async (transaction) => {
+    // The firm practises from Patna. Its own state code is half of every supply
+    // decision the billing code makes — intra-state or inter-state is decided by
+    // comparing it against the place of supply — so it is seeded, not left null.
+    // No GSTIN: the seeded registrations are non-statutory internal keys, and
+    // inventing a checksum-valid one would look like a real registration.
     await transaction.insert(tenants).values({
       ...fixture.tenant,
+      stateCode: "10",
       status: "active",
     }).onConflictDoUpdate({
       target: tenants.id,
@@ -275,6 +295,7 @@ export async function seedDevelopmentData(
         legalName: fixture.tenant.legalName,
         displayName: fixture.tenant.displayName,
         slug: fixture.tenant.slug,
+        stateCode: "10",
         status: "active",
         updatedAt: new Date(),
       },
@@ -813,24 +834,6 @@ export async function seedDevelopmentData(
       }).onConflictDoNothing();
     }
 
-    // One negotiated rate, so the override path has something real behind it.
-    const koshi = fixture.clients.find((entry) => entry.displayName.includes("Koshi"));
-    const rahul = fixture.members.find((entry) => entry.fullName === "Rahul K.");
-    if (koshi && rahul) {
-      await transaction.insert(clientRateOverrides).values({
-        tenantId: fixture.tenant.id,
-        legalEntityId: koshi.id,
-        employeeUserId: rahul.id,
-        effectiveFrom: "2026-04-01",
-        chargePaisePerHour: 2800 * 100,
-        note: "Agreed at engagement renewal",
-        createdByUserId: fixture.members[0]!.id,
-      }).onConflictDoUpdate({
-        target: [clientRateOverrides.tenantId, clientRateOverrides.legalEntityId, clientRateOverrides.employeeUserId, clientRateOverrides.effectiveFrom],
-        set: { chargePaisePerHour: 2800 * 100, updatedAt: new Date() },
-      });
-    }
-
     for (const client of fixture.clients) {
       const ownerId = memberIdByName.get(client.ownerName);
       await transaction.insert(clientGroups).values({
@@ -860,6 +863,7 @@ export async function seedDevelopmentData(
         entityType: client.entityType,
         maskedPan: client.maskedPan,
         city: client.city,
+        stateCode: stateCodeByCity[client.city] ?? null,
         relationshipStart: client.relationshipStart,
         status: "active",
       }).onConflictDoUpdate({
@@ -870,6 +874,7 @@ export async function seedDevelopmentData(
           entityType: client.entityType,
           maskedPan: client.maskedPan,
           city: client.city,
+          stateCode: stateCodeByCity[client.city] ?? null,
           relationshipStart: client.relationshipStart,
           status: "active",
           updatedAt: new Date(),
@@ -903,6 +908,26 @@ export async function seedDevelopmentData(
           set: { status: "active" },
         });
       }
+    }
+
+    // After the clients exist: the override is constrained to a legal entity,
+    // and naming one before the loop that creates it failed on a clean database.
+    // One negotiated rate, so the override path has something real behind it.
+    const koshi = fixture.clients.find((entry) => entry.displayName.includes("Koshi"));
+    const rahul = fixture.members.find((entry) => entry.fullName === "Rahul K.");
+    if (koshi && rahul) {
+      await transaction.insert(clientRateOverrides).values({
+        tenantId: fixture.tenant.id,
+        legalEntityId: koshi.id,
+        employeeUserId: rahul.id,
+        effectiveFrom: "2026-04-01",
+        chargePaisePerHour: 2800 * 100,
+        note: "Agreed at engagement renewal",
+        createdByUserId: fixture.members[0]!.id,
+      }).onConflictDoUpdate({
+        target: [clientRateOverrides.tenantId, clientRateOverrides.legalEntityId, clientRateOverrides.employeeUserId, clientRateOverrides.effectiveFrom],
+        set: { chargePaisePerHour: 2800 * 100, updatedAt: new Date() },
+      });
     }
 
     for (const item of fixture.workItems) {
