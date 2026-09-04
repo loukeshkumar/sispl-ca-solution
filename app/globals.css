@@ -17978,3 +17978,523 @@ form > .review-panel { margin-top: 16px; }
 
 .pricing-gaps { display: grid; gap: 8px; list-style: none; margin: 0; padding: 0; }
 .pricing-gaps li { color: var(--muted); font-size: var(--type-compact); }
+
+/* Operating manual ------------------------------------------------------- */
+/*
+ * A reading document inside a dashboard. The workspace measure is right for a
+ * register and far too wide for prose, so the rail takes a fixed column and the
+ * chapters keep a reading measure of their own rather than filling the canvas.
+ */
+
+.manual-shell {
+  --manual-measure: 68ch;
+}
+
+.manual-masthead {
+  border-bottom: 2px solid var(--ink);
+  margin-bottom: 28px;
+  padding-bottom: 24px;
+}
+
+.manual-masthead h1 {
+  color: var(--navy);
+  font-size: var(--type-page-title);
+  letter-spacing: -1px;
+  line-height: 1.12;
+  margin: 6px 0 0;
+  max-width: 22ch;
+}
+
+.manual-standfirst {
+  color: var(--muted);
+  font-size: 17px;
+  line-height: 1.5;
+  margin: 12px 0 0;
+  max-width: 52ch;
+}
+
+.manual-masthead-meta {
+  color: var(--muted);
+  font-size: var(--type-compact);
+  margin: 16px 0 0;
+}
+
+.manual-body {
+  align-items: start;
+  display: grid;
+  gap: 48px;
+  grid-template-columns: 244px minmax(0, 1fr);
+}
+
+/* Contents rail ---------------------------------------------------------- */
+
+/* The command bar is sticky at the top of the canvas, so the rail parks below
+ * it rather than sliding underneath. */
+.manual-rail {
+  max-height: calc(100vh - var(--command-bar-height) - 48px);
+  overflow-y: auto;
+  position: sticky;
+  scrollbar-width: thin;
+  top: calc(var(--command-bar-height) + 24px);
+}
+
+.manual-rail > .eyebrow { margin-bottom: 10px; }
+
+.manual-rail ol {
+  display: flex;
+  flex-direction: column;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.manual-rail-part > p {
+  color: var(--muted);
+  font-size: var(--type-label);
+  font-weight: 800;
+  letter-spacing: 1.1px;
+  margin: 16px 0 6px;
+  text-transform: uppercase;
+}
+
+.manual-rail-part:first-child > p { margin-top: 0; }
+
+.manual-rail-part li { border-left: 1px solid var(--border); }
+
+.manual-rail a {
+  align-items: baseline;
+  color: var(--muted);
+  display: flex;
+  font-size: var(--type-supporting);
+  gap: 8px;
+  line-height: 1.3;
+  padding: 5px 0 5px 12px;
+  text-decoration: none;
+}
+
+.manual-rail a:hover { color: var(--ink); }
+
+.manual-rail-number {
+  color: var(--muted);
+  font-size: var(--type-compact);
+  font-variant-numeric: tabular-nums;
+  min-width: 16px;
+}
+
+.manual-rail-part li.is-current {
+  border-left: 2px solid var(--violet);
+  margin-left: -1px;
+}
+
+.manual-rail-part li.is-current a,
+.manual-rail-part li.is-current .manual-rail-number {
+  color: var(--violet);
+  font-weight: 750;
+}
+
+/* Chapters --------------------------------------------------------------- */
+
+.manual-chapters { min-width: 0; }
+
+/* An anchor jump must clear the sticky command bar, or the chapter it lands on
+ * opens with its heading hidden behind the bar. */
+.manual-chapter {
+  padding-bottom: 52px;
+  scroll-margin-top: calc(var(--command-bar-height) + 20px);
+}
+
+.manual-chapter-head {
+  align-items: start;
+  border-top: 2px solid var(--ink);
+  column-gap: 16px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  margin-bottom: 22px;
+  padding-top: 34px;
+}
+
+.manual-chapter:first-child .manual-chapter-head {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.manual-chapter-number {
+  color: var(--accent-strong);
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.manual-chapter-head h2 {
+  color: var(--navy);
+  font-size: 28px;
+  letter-spacing: -0.7px;
+  line-height: 1.16;
+  margin: 0;
+}
+
+.manual-chapter-head p {
+  color: var(--muted);
+  grid-column: 2;
+  margin: 6px 0 0;
+  max-width: var(--manual-measure);
+}
+
+.manual-chapter h3 {
+  color: var(--navy);
+  font-size: 20px;
+  letter-spacing: -0.3px;
+  line-height: 1.25;
+  margin: 32px 0 8px;
+}
+
+.manual-chapter h4 {
+  color: var(--ink);
+  font-size: var(--type-card-title);
+  margin: 22px 0 6px;
+}
+
+.manual-chapter p,
+.manual-chapter > ul,
+.manual-chapter > ol {
+  font-size: 15px;
+  line-height: 1.62;
+  max-width: var(--manual-measure);
+}
+
+.manual-chapter > p { margin: 0 0 12px; }
+
+.manual-chapter > ul,
+.manual-chapter > ol { margin: 0 0 14px; padding-left: 20px; }
+
+.manual-chapter li { margin-bottom: 5px; }
+
+.manual-chapter code {
+  background: var(--soft-surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: var(--type-supporting);
+  overflow-wrap: anywhere;
+  padding: 1px 5px;
+}
+
+.manual-chapter kbd {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  color: var(--ink);
+  font-size: var(--type-compact);
+  font-weight: 650;
+  padding: 1px 6px;
+  white-space: nowrap;
+}
+
+.manual-path {
+  background: var(--soft-surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--muted);
+  font-size: var(--type-supporting);
+  padding: 1px 5px;
+  white-space: nowrap;
+}
+
+/* Terminal blocks -------------------------------------------------------- */
+
+.manual-terminal {
+  background: var(--soft-surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--violet);
+  border-radius: 8px;
+  font-size: var(--type-supporting);
+  line-height: 1.7;
+  margin: 0 0 14px;
+  max-width: var(--manual-measure);
+  overflow-x: auto;
+  padding: 12px 16px;
+}
+
+.manual-terminal code {
+  background: none;
+  border: 0;
+  font-size: var(--type-supporting);
+  padding: 0;
+}
+
+.manual-terminal-comment { color: var(--muted); }
+
+/* Procedures ------------------------------------------------------------- */
+
+.manual-steps {
+  border-left: 1px solid var(--border);
+  counter-reset: manual-step;
+  list-style: none;
+  margin: 14px 0 18px;
+  max-width: var(--manual-measure);
+  padding: 0 0 0 34px;
+}
+
+.manual-steps > li {
+  counter-increment: manual-step;
+  font-size: 15px;
+  line-height: 1.62;
+  margin-bottom: 14px;
+  position: relative;
+}
+
+.manual-steps > li::before {
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--violet);
+  content: counter(manual-step);
+  display: flex;
+  font-size: var(--type-compact);
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  height: 26px;
+  justify-content: center;
+  left: -47px;
+  position: absolute;
+  top: 0;
+  width: 26px;
+}
+
+.manual-steps > li > strong { display: block; }
+
+.manual-steps ul { margin: 6px 0 0; padding-left: 18px; }
+
+.manual-steps .manual-terminal,
+.manual-steps .manual-note,
+.manual-steps .manual-fields { margin-top: 8px; }
+
+/* Callouts --------------------------------------------------------------- */
+
+.manual-note {
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--muted);
+  border-radius: 0 10px 10px 0;
+  font-size: var(--type-primary);
+  line-height: 1.58;
+  margin: 16px 0;
+  max-width: var(--manual-measure);
+  padding: 12px 16px;
+}
+
+.manual-note > :last-child { margin-bottom: 0; }
+/* The callout sets its own size; prose inside it must not keep the chapter's,
+ * or a note reads at two sizes depending on whether it uses paragraphs. */
+.manual-note p { font-size: var(--type-primary); margin: 0 0 8px; max-width: none; }
+.manual-note ul { font-size: var(--type-primary); margin: 0; max-width: none; padding-left: 18px; }
+.manual-note li { margin-bottom: 5px; }
+
+.manual-note-tag {
+  color: var(--muted);
+  font-size: var(--type-label);
+  font-weight: 800;
+  letter-spacing: 1.1px;
+  margin: 0 0 4px;
+  text-transform: uppercase;
+}
+
+.manual-note.is-rule {
+  background: color-mix(in srgb, var(--violet) 6%, var(--surface));
+  border-left-color: var(--violet);
+}
+
+.manual-note.is-rule .manual-note-tag { color: var(--violet); }
+
+.manual-note.is-limit {
+  background: color-mix(in srgb, var(--red) 6%, var(--surface));
+  border-left-color: var(--red);
+}
+
+.manual-note.is-limit .manual-note-tag { color: var(--status-red-ink); }
+
+.manual-note.is-care {
+  background: color-mix(in srgb, var(--amber) 8%, var(--surface));
+  border-left-color: var(--amber);
+}
+
+.manual-note.is-care .manual-note-tag { color: var(--amber-ink); }
+
+/* State machines --------------------------------------------------------- */
+
+.manual-pipeline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  list-style: none;
+  margin: 14px 0 18px;
+  padding: 0;
+}
+
+.manual-pipeline li {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  border-top: 3px solid var(--muted);
+  flex: 1 1 138px;
+  margin: 0;
+  padding: 8px 12px;
+}
+
+.manual-pipeline li.is-locked { border-top-color: var(--red); }
+.manual-pipeline li.is-done { border-top-color: var(--mint); }
+
+.manual-pipeline-step {
+  color: var(--muted);
+  display: block;
+  font-size: var(--type-compact);
+  letter-spacing: 0.04em;
+}
+
+.manual-pipeline b {
+  display: block;
+  font-size: var(--type-primary);
+  line-height: 1.3;
+  margin-top: 2px;
+}
+
+/* Field lists ------------------------------------------------------------ */
+
+.manual-fields {
+  border-top: 1px solid var(--border);
+  margin: 14px 0 18px;
+  max-width: var(--manual-measure);
+}
+
+.manual-fields > div {
+  border-bottom: 1px solid var(--border);
+  display: grid;
+  gap: 0 16px;
+  grid-template-columns: minmax(140px, 200px) minmax(0, 1fr);
+}
+
+.manual-fields dt {
+  color: var(--ink);
+  font-size: var(--type-primary);
+  font-weight: 750;
+  padding: 8px 0;
+}
+
+.manual-fields dd {
+  color: var(--muted);
+  font-size: var(--type-primary);
+  margin: 0;
+  padding: 8px 0;
+}
+
+/* Tables ----------------------------------------------------------------- */
+
+.manual-table-frame {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin: 14px 0 18px;
+  overflow-x: auto;
+}
+
+.manual-table {
+  background: var(--surface);
+  border-collapse: collapse;
+  font-size: var(--type-primary);
+  width: 100%;
+}
+
+.manual-table th,
+.manual-table td {
+  border-bottom: 1px solid var(--border);
+  padding: 9px 14px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.manual-table thead th {
+  background: var(--soft-surface);
+  color: var(--muted);
+  font-size: var(--type-label);
+  font-weight: 800;
+  letter-spacing: 1.1px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.manual-table tbody tr:last-child td { border-bottom: 0; }
+.manual-table td code { white-space: nowrap; }
+
+.manual-matrix-cell { text-align: center; }
+.manual-matrix thead th:not(:first-child):not(:nth-child(2)) { text-align: center; }
+.manual-held { color: var(--mint-ink); font-weight: 800; }
+.manual-not-held { color: var(--muted); }
+
+.manual-risk {
+  color: var(--amber-ink);
+  font-size: var(--type-compact);
+  font-style: normal;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Dark theme ------------------------------------------------------------- */
+
+[data-theme="dark"] .manual-masthead,
+[data-theme="dark"] .manual-chapter-head {
+  border-color: var(--border);
+}
+
+[data-theme="dark"] .manual-masthead h1,
+[data-theme="dark"] .manual-chapter-head h2,
+[data-theme="dark"] .manual-chapter h3 {
+  color: var(--ink);
+}
+
+[data-theme="dark"] .manual-chapter-number { color: var(--accent); }
+
+[data-theme="dark"] .manual-rail-part li.is-current a,
+[data-theme="dark"] .manual-rail-part li.is-current .manual-rail-number {
+  color: var(--accent);
+}
+
+[data-theme="dark"] .manual-rail-part li.is-current { border-left-color: var(--accent); }
+[data-theme="dark"] .manual-terminal { border-left-color: var(--accent); }
+[data-theme="dark"] .manual-steps > li::before { color: var(--accent); }
+[data-theme="dark"] .manual-note.is-rule { border-left-color: var(--accent); }
+[data-theme="dark"] .manual-note.is-rule .manual-note-tag { color: var(--accent); }
+[data-theme="dark"] .manual-note.is-limit .manual-note-tag { color: var(--red); }
+[data-theme="dark"] .manual-note.is-care .manual-note-tag { color: var(--amber); }
+[data-theme="dark"] .manual-held { color: var(--mint); }
+
+/* Responsive ------------------------------------------------------------- */
+
+@media (max-width: 1023px) {
+  .manual-body {
+    gap: 0;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .manual-rail {
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 28px;
+    max-height: none;
+    padding-bottom: 20px;
+    position: static;
+  }
+
+  .manual-rail > ol {
+    display: grid;
+    gap: 0 20px;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  }
+}
+
+@media (max-width: 767px) {
+  .manual-fields > div { grid-template-columns: minmax(0, 1fr); }
+  .manual-fields dt { padding-bottom: 0; }
+  .manual-fields dd { padding-top: 2px; }
+  .manual-steps { padding-left: 26px; }
+  .manual-steps > li::before { left: -39px; }
+  .manual-chapter-head h2 { font-size: 23px; }
+}

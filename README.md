@@ -42,6 +42,8 @@ npm run build
 npm run lint
 ```
 
+A change that adds a module or alters a workflow must update the in-product manual (`app/manual/`) in the same commit. `test:unit` enforces the mechanical part — every sidebar destination, routed page, and typed workflow state must be documented — and [AGENTS.md](AGENTS.md) states the rule in full.
+
 `test:integration` requires `.env.local` and creates/uses an isolated database ending in `_test`; it never runs lifecycle mutations against the development database. It checks connectivity, repeated seeding, concurrent authentication throttles, composite tenant constraints, employee access provisioning, task ownership/state transitions, attendance locking, payroll approval/publication/payment, payslip privacy, and complete audited client, compliance-work, and document lifecycles.
 
 ## Architecture
@@ -65,6 +67,7 @@ npm run lint
 - `lib/filings/` — portal filing acknowledgements (ARN, filed date, portal status) recorded against obligations as evidence
 - `app/registers/` and `lib/registers/` — UDIN register, DSC custody register with a movement trail, and statutory notice management with response deadlines
 - `app/timesheets/` and `lib/timesheets/` — time entries against clients, obligations, and tasks, with per-engagement effort review
+- `app/manual/` and `lib/manual/` — the operating manual inside the product: 29 chapters covering every workflow, open to every signed-in role. Its permission tables render from `permissionDefinitions` and `lib/dashboard/navigation`, so the manual cannot describe a rule the server no longer enforces
 - `app/portal/` and `lib/portal/` — the client portal: a separate low-privilege authentication boundary where a client contact sees their own compliance status, document requests, and invoices, and uploads requested files
 - `app/billing/` and `lib/billing/` — permission-protected draft invoices, issue/payment/cancellation lifecycle, and receivables register
 - `lib/notifications/` — dedupe-keyed in-app notifications, delivery outbox, and dispatch transports: a log-only default, an HTTP email sender, and the WhatsApp Business Cloud API

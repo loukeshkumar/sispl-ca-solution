@@ -112,6 +112,10 @@ const navigation: NavSection[] = [
         ],
         label: "Settings",
       },
+      // Documentation, not configuration, so it sits beside Settings rather
+      // than inside it — and open to everyone, since the person who most needs
+      // the manual is the one who holds the fewest permissions.
+      { href: "/manual", icon: "documents", label: "Manual" },
     ],
     hue: "firm",
     label: "FIRM",

@@ -46,6 +46,9 @@ export const workspacePermissions: Record<string, Permission> = {
  */
 export const openWorkspaces: ReadonlySet<string> = new Set([
   "Calendar",
+  // The operating manual. Gating documentation would hide it from the role
+  // that needs it most, and it describes the product rather than firm data.
+  "Manual",
   "My work",
   "Overview",
   "Performance",
