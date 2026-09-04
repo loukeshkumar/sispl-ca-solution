@@ -17,6 +17,7 @@
     "db:migrate:local": "node --env-file=.env.local --import tsx scripts/db/migrate.ts",
     "db:seed:local": "node --env-file=.env.local --import tsx scripts/db/seed.ts",
     "db:check:local": "node --env-file=.env.local --import tsx scripts/db/check.ts",
+  "db:seed:demo": "node --env-file=.env.local --import tsx scripts/db/seed-demo.ts",
     "db:reconcile-documents:local": "node --env-file=.env.local --import tsx scripts/db/reconcile-documents.ts",
     "db:setup:local": "npm run db:migrate:local && npm run db:seed:local && npm run db:check:local",
     "db:setup:test": "node --env-file=.env.local --import tsx scripts/db/setup-test.ts",

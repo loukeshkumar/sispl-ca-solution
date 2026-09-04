@@ -271,7 +271,8 @@ export default function RunningChapters() {
               <tr><td><code>npm run test:integration</code></td><td>Integration tests against an isolated <code>_test</code> database</td></tr>
               <tr><td><code>npm run db:setup:local</code></td><td>Migrate, seed and check in one go</td></tr>
               <tr><td><code>npm run db:migrate:local</code></td><td>Apply migrations</td></tr>
-              <tr><td><code>npm run db:seed:local</code></td><td>Idempotent seed</td></tr>
+              <tr><td><code>npm run db:seed:local</code></td><td>Idempotent seed — the firm, its people, clients and masters</td></tr>
+              <tr><td><code>npm run db:seed:demo</code></td><td>Demonstration history for the seeded firm: a closed attendance month carried through to a paid payroll run, invoices, documents, timesheets and registers. Opt-in and never part of <code>db:setup:local</code>, so a real firm never receives invented payroll runs and invoices</td></tr>
               <tr><td><code>npm run db:check:local</code></td><td>Redacted connection check</td></tr>
               <tr><td><code>npm run db:generate</code></td><td>Generate a Drizzle migration from the schema</td></tr>
               <tr><td><code>npm run db:reconcile-documents:local</code></td><td>Reconcile interrupted staged uploads</td></tr>

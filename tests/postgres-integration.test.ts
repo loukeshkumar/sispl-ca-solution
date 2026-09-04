@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import { randomUUID } from "node:crypto";
 import { and, count, eq, inArray, isNotNull, ne } from "drizzle-orm";
+import type { PgColumn, PgTable } from "drizzle-orm/pg-core";
 
 import {
   attendanceDays, attendanceEvents, attendancePeriodSummaries, attendancePeriods, attendancePolicies, auditEvents, employeeBankAccounts,
@@ -9,7 +10,7 @@ import {
   clientPackageAssignments, clientPackageAssignmentServices, clientPortalCredentials, clientPortalSessions, clientPortalUsers, filingAcknowledgements, invoiceLines, invoices, legalEntities, notificationDeliveries, notifications, officeTasks, payrollEntries, payrollEntryLines, payrollRuns, personalTodos, registrations,
   roleDefinitions, rolePermissions, salaryStructureLines, salaryStructures, tenantMemberships, tenants, userCredentials, userSessions, users, workItems,
   serviceCatalog, servicePackageItems, servicePackages, statutoryRateParameters, statutoryRateVersions,
-  dscCertificates, dscCustodyEvents, statutoryNotices,
+  dscCertificates, dscCustodyEvents, statutoryNotices, udinRegistrations,
 } from "../db/schema";
 import { changePassword, clearFailedLogins, consumeLoginRateLimit, findLoginIdentity, createSessionRecord, findSessionByTokenHash, recordFailedLogin, revokeSessionByTokenHash } from "../lib/auth/repository";
 import { PasswordChangeError } from "../lib/auth/repository";
@@ -25,6 +26,7 @@ import { applyBulkWorkChange, completeWorkItem, createWorkItem, getWorkItem360, 
 import { getCapacityLanes, getQueueTotals, listWorkQueue } from "../lib/work/queue";
 import { DEFAULT_WORK_QUEUE_PARAMS } from "../lib/work/queue-params";
 import { getSeedCounts, seedDevelopmentData } from "../scripts/db/seed";
+import { seedDemoHistory } from "../scripts/db/seed-demo";
 import { createEmployee, disableEmployee, expireEmployeePassword, getEmployee360, listEmployees, provisionEmployeeAccess, TeamRepositoryError, updateEmployee } from "../lib/team/repository";
 import { applyBulkTaskChange, completeOfficeTask, createOfficeTask, getTask360, listTaskWorkspace, TaskRepositoryError, updateOfficeTask, updateOwnTaskStatus } from "../lib/tasks/repository";
 import { getTaskCapacityLanes, listTaskQueue } from "../lib/tasks/queue";
@@ -2272,4 +2274,77 @@ test("a bulk request cancel applies the valid subset, is tenant scoped, and audi
       await database.delete(documentRequests).where(eq(documentRequests.id, id));
     }
   }
+});
+
+test("the demo seed fills the empty workspaces and is idempotent", async () => {
+  const database = getDatabase();
+  await seedDevelopmentData(database);
+
+  // The real clock, deliberately. The `now` option moves this seed's own date
+  // arithmetic, but the services it calls validate against the actual day —
+  // `createTimeEntry` refuses a date that has not happened — so seeding at a
+  // future `now` would exercise a configuration that cannot occur in use.
+  const first = await seedDemoHistory(database);
+  const closedMonth = String(first.closedMonth);
+  const currentMonth = String(first.currentMonth);
+
+  const countOf = async (table: PgTable, tenantColumn: PgColumn) => {
+    const [row] = await database.select({ value: count() }).from(table).where(eq(tenantColumn, SEEDED_TENANT_ID));
+    return Number(row?.value ?? 0);
+  };
+
+  // Every workspace that rendered empty before now has rows.
+  assert.ok(await countOf(attendancePeriods, attendancePeriods.tenantId) >= 2, "both demo months exist");
+  assert.ok(await countOf(attendanceDays, attendanceDays.tenantId) > 0, "attendance days exist");
+  assert.ok(await countOf(payrollRuns, payrollRuns.tenantId) > 0, "a payroll run exists");
+  assert.ok(await countOf(invoices, invoices.tenantId) > 0, "invoices exist");
+  assert.ok(await countOf(documents, documents.tenantId) > 0, "an uploaded document exists");
+  assert.ok(await countOf(udinRegistrations, udinRegistrations.tenantId) > 0, "the UDIN register is populated");
+  assert.ok(await countOf(dscCertificates, dscCertificates.tenantId) > 0, "the DSC register is populated");
+  assert.ok(await countOf(statutoryNotices, statutoryNotices.tenantId) > 0, "the notice register is populated");
+
+  // The closed month reaches its terminal states. A demo that stops at `draft`
+  // shows the workflow but not that the workflow completes.
+  const [closedPeriod] = await database.select({ status: attendancePeriods.status }).from(attendancePeriods).where(and(
+    eq(attendancePeriods.tenantId, SEEDED_TENANT_ID), eq(attendancePeriods.periodKey, closedMonth),
+  ));
+  assert.equal(closedPeriod?.status, "locked", "the closed month must lock, or no payroll run is possible");
+  const [demoRun] = await database.select({ status: payrollRuns.status }).from(payrollRuns).where(and(
+    eq(payrollRuns.tenantId, SEEDED_TENANT_ID), eq(payrollRuns.periodKey, closedMonth),
+  ));
+  assert.equal(demoRun?.status, "paid");
+
+  // The current month is deliberately left in flight, which is what makes the
+  // attendance-to-payroll dependency visible rather than merely stated.
+  const [currentPeriod] = await database.select({ status: attendancePeriods.status }).from(attendancePeriods).where(and(
+    eq(attendancePeriods.tenantId, SEEDED_TENANT_ID), eq(attendancePeriods.periodKey, currentMonth),
+  ));
+  assert.equal(currentPeriod?.status, "open");
+  const [currentRun] = await database.select({ id: payrollRuns.id }).from(payrollRuns).where(and(
+    eq(payrollRuns.tenantId, SEEDED_TENANT_ID), eq(payrollRuns.periodKey, currentMonth),
+  ));
+  assert.equal(currentRun, undefined, "an unlocked month carries no payroll run");
+
+  // Publishing payslips notifies each employee; the seed fabricates none of these.
+  const [payslipNotices] = await database.select({ value: count() }).from(notifications).where(and(
+    eq(notifications.tenantId, SEEDED_TENANT_ID), eq(notifications.type, "payslip_published"),
+  ));
+  assert.ok(Number(payslipNotices?.value ?? 0) > 0, "publishing payslips must notify employees");
+
+  // Re-running adds nothing: each module probes for its own work first.
+  const before = {
+    invoices: await countOf(invoices, invoices.tenantId),
+    documents: await countOf(documents, documents.tenantId),
+    days: await countOf(attendanceDays, attendanceDays.tenantId),
+    runs: await countOf(payrollRuns, payrollRuns.tenantId),
+    udin: await countOf(udinRegistrations, udinRegistrations.tenantId),
+  };
+  await seedDemoHistory(database);
+  assert.deepEqual({
+    invoices: await countOf(invoices, invoices.tenantId),
+    documents: await countOf(documents, documents.tenantId),
+    days: await countOf(attendanceDays, attendanceDays.tenantId),
+    runs: await countOf(payrollRuns, payrollRuns.tenantId),
+    udin: await countOf(udinRegistrations, udinRegistrations.tenantId),
+  }, before, "a second run must not duplicate anything");
 });
