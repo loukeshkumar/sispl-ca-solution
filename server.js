@@ -22,7 +22,11 @@ import { createServer } from "node:http";
 
 import next from "next";
 
-const listenTarget = process.env.PORT ?? 3000;
+// 3022 is this application's port on the Windows host. It applies whenever the
+// process is started directly — `node server.js`, a service wrapper, or an IIS
+// reverse proxy pointed at 127.0.0.1:3022. Under iisnode PORT is already the
+// named pipe, so the fallback never applies and nothing listens on 3022.
+const listenTarget = process.env.PORT ?? 3022;
 
 // The working directory iisnode starts the process in is not guaranteed to be
 // the site root, so the app directory is taken from this file's own location.
