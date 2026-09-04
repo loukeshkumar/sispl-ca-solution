@@ -412,6 +412,15 @@ export async function seedDevelopmentData(
         });
       }
 
+    }
+
+    // A second pass, because two foreign keys here point at another member's
+    // membership row: `employee_capabilities_assessor_membership_fk` and
+    // `employee_work_profiles_manager_membership_fk`. The assurance partner is
+    // the fourth member, so naming her as assessor or manager from inside the
+    // member loop referenced a membership that did not exist yet, and the seed
+    // failed on any database where the rows were not already present.
+    for (const [index, member] of fixture.members.entries()) {
       // Assessed by the assurance partner — except for the partner herself, who
       // is assessed by the firm administrator. Nobody rates their own capability,
       // and a seed that quietly dropped the partner's ratings would leave the
